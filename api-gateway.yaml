@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ""
+Parameters:
+  ServiceName:
+    Type: String
+    Description: Nombre del microservicio
+    Default: paketo
+  APIBasePath:
+    Type: String 
+    Description: Basepath en API Gateway
+    Default: "" 
+  StageName:
+    Type: String 
+    Description: Nombre del stage del API Gateway estándar
+    Default: api        
+##############################
+# Definición de API Gateway  #
+##############################
+Conditions:
+  IsAPIBasePathNotEmpty:  !Not [!Equals [!Ref "APIBasePath", ""]]
+
+Resources:
+    Api:
+      Condition: IsAPIBasePathNotEmpty
+      Type: 'AWS::ApiGateway::RestApi'
+      Properties:
+        Name: !Ref ServiceName
+
+    Resource:
+      Condition: IsAPIBasePathNotEmpty
+      Type: 'AWS::ApiGateway::Resource'
+      Properties:
+        ParentId: !GetAtt Api.RootResourceId
+        RestApiId: !Ref Api
+        PathPart: '{proxy+}'
+
+    RootMethod:
+      Condition: IsAPIBasePathNotEmpty
+      Type: 'AWS::ApiGateway::Method'
+      Properties:
+        HttpMethod: ANY
+        ResourceId: !GetAtt Api.RootResourceId
+        RestApiId: !Ref Api
+        AuthorizationType: NONE
+        Integration:
+          IntegrationHttpMethod: ANY
+          ConnectionType: VPC_LINK
+          ConnectionId: !ImportValue ApiGatewayVpcLink        
+          Type: HTTP_PROXY
+          Uri: !Sub 
+            - "http://${DNSNLB}${APIBasePath}"
+            - DNSNLB: !ImportValue DNSNLB
+          PassthroughBehavior: WHEN_NO_MATCH
+          IntegrationResponses:
+            - StatusCode: 200
+
+    ProxyMethod:
+      Condition: IsAPIBasePathNotEmpty
+      Type: 'AWS::ApiGateway::Method'
+      Properties:
+        HttpMethod: ANY
+        ResourceId: !Ref Resource
+        RestApiId: !Ref Api
+        AuthorizationType: NONE
+        RequestParameters:
+          method.request.path.proxy: true
+        Integration:
+          RequestParameters:
+            integration.request.path.proxy: 'method.request.path.proxy'
+          IntegrationHttpMethod: ANY
+          ConnectionType: VPC_LINK
+          ConnectionId: !ImportValue ApiGatewayVpcLink
+          Type: HTTP_PROXY
+          Uri: !Sub 
+            - "http://${DNSNLB}${APIBasePath}"
+            - DNSNLB: !ImportValue DNSNLB
+          PassthroughBehavior: WHEN_NO_MATCH
+          IntegrationResponses:
+            - StatusCode: 200
+
+    Deployment:
+      Condition: IsAPIBasePathNotEmpty    
+      DependsOn:
+        - RootMethod
+        - ProxyMethod
+      Type: 'AWS::ApiGateway::Deployment'
+      Properties:
+        RestApiId: !Ref Api
+        StageName: !Ref StageName
+    APIKey:
+      Condition: IsAPIBasePathNotEmpty
+      Type: AWS::ApiGateway::ApiKey
+      Properties: 
+        Enabled: true
+        Name: !Sub "${ServiceName}-apikey"
+        StageKeys: 
+          - RestApiId: !Ref Api
+            StageName: !Ref StageName
+    
+    APIUsagePlan:  
+      Condition: IsAPIBasePathNotEmpty
+      Type: AWS::ApiGateway::UsagePlan
+      Properties: 
+        ApiStages: 
+          - ApiId: !Ref Api
+            Stage: !Ref StageName
+        UsagePlanName: !Ref ServiceName
+
+    APIUsagePlanKey:
+      Condition: IsAPIBasePathNotEmpty
+      Type: AWS::ApiGateway::UsagePlanKey
+      Properties: 
+        KeyId: !Ref APIKey
+        KeyType: API_KEY
+        UsagePlanId: !Ref APIUsagePlan
+

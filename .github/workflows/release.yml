@@ -1,0 +1,161 @@
+name: Release
+
+permissions:
+  id-token: write
+  contents: read    
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUILDER: paketobuildpacks/builder:base
+  AWS_DEPLOY_REGION: us-east-2
+  AWS_SAM_VERSION: 1.37.0
+  AWS_ECS_SERVICE_NAME: hello-world
+  CONSULTORA: hello-world
+  CONTAINER_PORT: 8000
+  API_BASE_PATH: /api-test/v1/hola
+  HEALTH_PATH: /api-test/v1/salud
+  PRIORIDAD_LISTENER: 2
+  BUILDPACK: paketo-buildpacks/nodejs
+  
+jobs:
+
+  register:
+    name: Build and deploy
+    runs-on:
+    - ubuntu-latest
+    steps:
+    - id: checkout
+      uses: actions/checkout@v3
+
+    - name: "CFN Lint - Linter de Cloudformation"
+      run: |
+        pip install cfn-lint==0.73.2
+        cfn-lint service-components.yaml
+
+    - uses: docker/login-action@v2
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKER_HUB_USER }}
+        password: ${{ secrets.DOCKER_HUB_PASS }}
+
+    - name: Cache Pack
+      id: cache-pack
+      uses: actions/cache@v3
+      with:
+        path: /usr/local/bin/pack
+        key: ${{ runner.os }}-pack-${{ hashFiles('**/pack*') }}
+
+    # Configurar paketo https://paketo.io/
+    - id: setup-pack
+      uses: buildpacks/github-actions/setup-pack@v4.9.0
+
+    - name: build image
+      run: pack build paketo --builder ${{ env.BUILDER }} --path . --buildpack ${{ env.BUILDPACK }}
+
+    - name: Tag Image
+      # Cuando se taguea la imagen se agrega el usuario debido a que así tiene el nombrado el repo privado en DockerHub
+      run: docker tag paketo ${{ secrets.DOCKER_HUB_USER }}/${{ env.AWS_ECS_SERVICE_NAME }}:${{ github.sha }}  
+
+    - name: Push Image
+      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.AWS_ECS_SERVICE_NAME }}:${{ github.sha }}
+
+    # Autenticar en AWS sin utilizar secretos
+    - name: Configure AWS Deploy Role 
+      uses: aws-actions/configure-aws-credentials@v1-node16
+      with: 
+        aws-region: ${{ env.AWS_DEPLOY_REGION }}
+        role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }} 
+        role-session-name: github-deploy-paketo
+
+    - name: Reemplazo de ARN's en Task Definition
+      run: |
+        jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.taskRoleArn |= "${{ secrets.TASK_EXECUTION_ROLE }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.executionRoleArn |= "${{ secrets.TASK_EXECUTION_ROLE }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+        
+        jq -r '.containerDefinitions[].name |= "${{ env.AWS_ECS_SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.family |= "${{ env.AWS_ECS_SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-group" |= "/ecs/${{ env.AWS_ECS_SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-region" |= "${{ env.AWS_DEPLOY_REGION }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.CONTAINER_PORT }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+
+    - name: Render Amazon ECS Task Definition
+      id: render-task-definition
+      uses: aws-actions/amazon-ecs-render-task-definition@v1 
+      with: 
+        task-definition: task-definition.json
+        container-name: ${{ env.AWS_ECS_SERVICE_NAME }}
+        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.AWS_ECS_SERVICE_NAME }}:${{ github.sha }}
+        environment-variables: |
+            LOG_LEVEL=info
+            CONTEXT_NAME=api-test
+            CONTEXT_VERSION=v1
+            DECODE_FILE=ISO-8859-1
+            NODE_ENV=dev 
+            PORT=${{ env.CONTAINER_PORT }}
+
+    - name: Deploy Amazon ECS task definition 
+      id: deploy-task-definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+
+    - name: Task Definition ARN
+      run: echo ${{ steps.deploy-task-definition.outputs.task-definition-arn }}
+
+    - name: Install SAM CLI
+      uses: aws-actions/setup-sam@v2
+      with: 
+        version: ${{ env.AWS_SAM_VERSION }}
+
+    - name: Crear bucket de SAM si no existe
+      run: |
+        aws s3api head-bucket --bucket "sam-bucket-paketo" 2>/dev/null || aws s3 mb s3://sam-bucket-paketo
+        echo "Habilitando versionamiento"
+        aws s3api put-bucket-versioning --bucket "sam-bucket-paketo" --versioning-configuration Status=Enabled || echo "No se pudo realizar la operación"
+
+    - name: Crear/Actualizar servicio ECS
+      run: |
+        sam deploy \
+        -t service-components.yaml \
+        --stack-name ${{ env.AWS_ECS_SERVICE_NAME }}-service \
+        --no-fail-on-empty-changeset  \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --no-confirm-changeset \
+        --s3-bucket sam-bucket-paketo \
+        --s3-prefix ${{ env.AWS_ECS_SERVICE_NAME }}-service \
+        --parameter-overrides="ServiceName=${{ env.AWS_ECS_SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
+        HealthPath=${{ env.HEALTH_PATH }} APIBasePath=${{ env.API_BASE_PATH}} Consultora=${{ env.CONSULTORA }} ContainerPort=${{ env.CONTAINER_PORT }} \
+        PrioridadListener=${{ env.PRIORIDAD_LISTENER }}"
+    
+    - name: Crear/Actualizar API Gateway
+      run: |
+        sam deploy \
+        -t api-gateway.yaml \
+        --stack-name ${{ env.AWS_ECS_SERVICE_NAME }}-api \
+        --no-fail-on-empty-changeset  \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --no-confirm-changeset \
+        --s3-bucket sam-bucket-paketo \
+        --s3-prefix ${{ env.AWS_ECS_SERVICE_NAME }}-api \
+        --parameter-overrides="ServiceName=${{ env.AWS_ECS_SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
+        APIBasePath=${{ env.API_BASE_PATH}}"

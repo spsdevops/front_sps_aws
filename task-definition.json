@@ -1,0 +1,54 @@
+{
+    "containerDefinitions": [
+        {
+            "name": "paketo",
+            "image": "",
+            "repositoryCredentials": {
+                "credentialsParameter": "ARN_CREDENTIALS_DOCKERHUB"
+            },
+            "cpu": 0,
+            "links": [],
+            "portMappings": [
+                {
+                    "containerPort": 8001,
+                    "protocol": "tcp"
+                }
+            ],
+            "essential": true,
+            "entryPoint": [],
+            "command": [],
+            "environment": [],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "secrets": [],
+            "dnsServers": [],
+            "dnsSearchDomains": [],
+            "extraHosts": [],
+            "dockerSecurityOptions": [],
+            "dockerLabels": {},
+            "limits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "",
+                    "awslogs-region": "",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "",
+    "taskRoleArn": "TASK_EXECUTION_ROLE",
+    "executionRoleArn": "TASK_EXECUTION_ROLE",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024"
+}
