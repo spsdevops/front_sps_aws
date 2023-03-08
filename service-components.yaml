@@ -157,7 +157,7 @@ Resources:
       - ALBListenerProdRule
     Properties:
       ServiceName: !Ref ServiceName
-      Cluster: !Sub "ECSCluster-${Consultora}"
+      Cluster: !Ref Consultora
       LoadBalancers: 
         - 
           TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
