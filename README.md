@@ -1,86 +1,64 @@
-<p align="center">
-  <h3 align="center">Angular Example App</h3>
+# ![Next.js + SWR Example App](project-logo.png)
 
-  <p align="center">
-    Example app with Angular 15 + i18n + Standalone Components and GraphQL
-    <br>
-    <br>
-    :clap::clap::tada::tada::tada::tada::clap::clap:
-    <br>
-    <br>
-    Real World App made with much :heart:. Contains CRUD, advanced patterns and much more!
-    <br>
-    <br>
-    <img src="https://media.giphy.com/media/lIbaRQKLbCWkUZUOYs/giphy.gif" alt="Demo example"/>
-    <br>
-    <br>
-    <a href="https://angular-example-app.onrender.com/">DEMO HERE</a>
-  </p>
-</p>
+> ### Next.js + SWR codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld-example-apps) spec and API.
 
-## Setup
+### [Demo](https://next-realworld.now.sh/)&nbsp;&nbsp;&nbsp;&nbsp;[RealWorld](https://github.com/gothinkster/realworld)
 
-```bash
-npm i
-npm start
-```
+Originally created for this [GH issue](https://github.com/gothinkster/realworld/issues/336). The codebase is now feature complete; please submit bug fixes via pull requests & feedback via issues.
 
-## Status
+We're currently working on some docs for the codebase (explaining where functionality is located, how it works, etc) but most things should be self explanatory if you have a minimal understanding of Next.js/SWR.
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=angular-example-app&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=angular-example-app)[![GitHub stars](https://img.shields.io/github/stars/ismaestro/angular8-example-app.svg?style=social&label=Star)](https://github.com/ismaestro/angular8-example-app)
-[![GitHub forks](https://img.shields.io/github/forks/ismaestro/angular8-example-app.svg?style=social&label=Fork)](https://github.com/ismaestro/angular8-example-app/fork)
+## Getting started
 
-## Server
+You can view a live demo over at [https://next-realworld.now.sh/](https://next-realworld.now.sh/)
 
-This project is using a real app deployed in render.com, which you can see
-[here](https://github.com/Ismaestro/nestjs-example-app). The server is using NestJS, Prisma,
-Postgres and GraphQL. Please check it out and also feel free to contribute or give me your thoughts.
+To get the frontend running locally:
 
-## What's included
+- Clone this repo
+- `npm install` to install all dependencies
+- `npm run dev` to start the local server
 
-- [x] Standalone components
-- [x] CRUD: create, update and remove heroes with this project!
-- [x] Authentication with JWT tokens (Interceptor and Guard)
-- [x] Internationalization with the official i18n. English and Spanish available.
-- [x] Lazy loading modules
-- [x] Amazing reactive functionalities with [elf](https://github.com/ngneat/elf)
-- [x] More logical directory structure
-- [x] Following the [best practices](https://angular.io/guide/styleguide)!
-- [x] Responsive layout with Bootstrap 5
-- [x] Use of [NgOptimizedImage](https://angular.io/guide/image-directive)
-- [x] SASS with BEM styles
-- [x] Example tests for: Component, Service, Interceptor, Directive and Guard
-- [x] End-to-end tests configuration with Cypress and Cucumber, and Playwright
-- [x] Very strict ESLint rules
+### Making requests to the backend API
 
-## Bugs and feature requests
+For convenience, we have a live API server running at `https://conduit.productionready.io/api` for the application to make requests against. You can view [the API spec here](https://github.com/GoThinkster/productionready/blob/master/api) which contains all routes & responses for the server.
 
-Have a bug or a feature request? Please first read the issue guidelines and search for existing and
-closed issues. If your problem or idea is not addressed yet,
-[please open a new issue](https://github.com/Ismaestro/angular-example-app/issues/new).
+The source code for the backend server (available for Node, Rails and Django) can be found in the [main RealWorld repo](https://github.com/gothinkster/realworld).
 
-If you have an idea or you want to do something, tell me or just do it! I'm always happy to hear
-your feedback!
+If you want to change the API URL to a local server, simply edit `lib/utils/constant.js` and change `SERVER_BASE_URL` to the local server's URL (i.e. `localhost:3000/api`)
 
-## Creators
+## Functionality overview
 
-**Ismael Ramos**
+The example application is a social blogging site (i.e. a Medium.com clone) called "Conduit". It uses a custom API for all requests, including authentication. You can view a live demo over at [https://next-realworld.now.sh/](https://next-realworld.now.sh/)
 
-- <https://github.com/ismaestro>
+**General functionality:**
 
-## Thanks
+- Authenticate users via JWT (login/register pages + logout button on settings page)
+- CRU\* users (sign up & settings page - no deleting required)
+- CRUD Articles
+- CR\*D Comments on articles (no updating required)
+- GET and display paginated lists of articles
+- Favorite articles
+- Follow other users
 
-I´m developing this project in my free time, but also thanks to all contributors!
+**The general page breakdown looks like this:**
 
-<p>
-  <a href="https://www.buymeacoffee.com/ismaestro">
-    <img src="https://res.cloudinary.com/ismaestro/image/upload/c_scale,w_200/v1677755383/angularexampleapp/bmc_qr_tjz1ws.png" alt="Buy me a coffe"/>
-  </a>
-</p>
+- Home page (URL: /)
+  - List of tags
+  - List of articles pulled from either Feed, Global, or by Tag
+  - Pagination for list of articles
+- Sign in/Sign up pages (URL: /user/login, /user/register)
+  - Use JWT (store the token in localStorage)
+- Settings page (URL: /user/settings )
+- Editor page to create/edit articles (URL: /editor/new, /editor/article-slug-here)
+- Article page (URL: /article/article-slug-here)
+  - Delete article button (only shown to article's author)
+  - Render markdown from server client side
+  - Comments section at bottom of page
+  - Delete comment button (only shown to comment's author)
+- Profile page (URL: /profile/username-here, /profile/username-here?favorite=true)
+  - Show basic user info
+  - List of articles populated from author's created articles or author's favorited articles
 
-## Copyright and license
+<br />
 
-Code and documentation copyright 2023 the authors. Code released under the
-[MIT License](https://github.com/Ismaestro/angular-example-app/blob/master/LICENSE).
-
-Enjoy :metal:
+[![Brought to you by Thinkster](https://raw.githubusercontent.com/gothinkster/realworld/master/media/end.png)](https://thinkster.io)
