@@ -3,6 +3,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Componentes necesarios para exponer un Frontend"
 
 Parameters:
+
+  Consultora:
+    Type: String
+    Description: Nombre de la consultora
+
   ContainerPort:
     Type: Number
     Default: 80
@@ -33,6 +38,10 @@ Parameters:
     Type: String
     Default: paketo
     Description: Nombre del microservicio
+
+  TaskDefinitionARN:
+    Type: String
+    Description: ARN de Task Definition
 
   HostedZoneId:
     Type: String
@@ -141,3 +150,34 @@ Resources:
               HostedZoneId: !Ref HostedZoneId
       ValidationMethod: DNS
 
+  ECSService:
+    Type: "AWS::ECS::Service"
+    DependsOn:
+      - TaskLogGroup
+      - ALBListenerProdRule
+    Properties:
+      ServiceName: !Ref ServiceName
+      Cluster: !Sub "ECSCluster-${Consultora}"
+      LoadBalancers: 
+        - 
+          TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
+          ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+      DesiredCount: 1
+      LaunchType: "FARGATE"
+      PlatformVersion: "1.4.0"
+      TaskDefinition: !Ref TaskDefinitionARN
+      DeploymentConfiguration: 
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      NetworkConfiguration: 
+        AwsvpcConfiguration: 
+          AssignPublicIp: "DISABLED"
+          SecurityGroups: 
+            - !Ref EC2SecurityGroup
+          Subnets: 
+            - Fn::ImportValue: !Sub "${NombreVPC}-PrivateSubnet1a"
+      HealthCheckGracePeriodSeconds: 0
+      SchedulingStrategy: "REPLICA"
+      DeploymentController: 
+          Type: "ECS"
