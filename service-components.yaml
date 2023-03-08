@@ -3,10 +3,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Componentes necesarios para exponer un Frontend"
 
 Parameters:
-  Consultora:
-    Type: String
-    Description: Nombre de la consultora
-
   ContainerPort:
     Type: Number
     Default: 80
@@ -33,19 +29,10 @@ Parameters:
     Type: Number
     Description: Prioridad de de la regla en el listener. No se debe repetir.
 
-  Replicas:
-    Type: Number
-    Default: 1
-    Description: Numero de replicas que se crerán del contenedor
-
   ServiceName:
     Type: String
     Default: paketo
     Description: Nombre del microservicio
-
-  TaskDefinitionARN:
-    Type: String
-    Description: ARN de Task Definition
 
   HostedZoneId:
     Type: String
@@ -154,33 +141,3 @@ Resources:
               HostedZoneId: !Ref HostedZoneId
       ValidationMethod: DNS
 
-  ECSService:
-    Type: "AWS::ECS::Service"
-    DependsOn:
-      - TaskLogGroup
-      - ALBListenerProdRule
-    Properties:
-      Cluster: !Sub ECSCluster-${Consultora}
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
-      DeploymentController:
-        Type: ECS
-      DesiredCount: !Ref Replicas
-      HealthCheckGracePeriodSeconds: 0
-      LaunchType: FARGATE
-      LoadBalancers:
-        - ContainerName: !Ref ServiceName
-          ContainerPort: !Ref ContainerPort
-          TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - Ref: EC2SecurityGroup
-          Subnets:
-            - "Fn::ImportValue": !Sub ${NombreVPC}-PrivateSubnet1a
-      PlatformVersion: "1.4.0"
-      SchedulingStrategy: REPLICA
-      ServiceName: !Ref ServiceName
-      TaskDefinition: !Ref TaskDefinitionARN
