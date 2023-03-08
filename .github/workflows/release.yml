@@ -18,8 +18,8 @@ env:
   
   SERVICE_NAME: front-hello-world
   SERVICE_PORT: 8000
-  SERVICE_BASE_PATH: /api-test/v1/
-  SERVICE_HEALTH_PATH: /${{secrets.CONTEXT}}/${{secrets.CONTEXT_NAME}}/salud
+  SERVICE_BASE_PATH: /
+  SERVICE_HEALTH_PATH: /
   SERVICE_DOMAIN: test.com
 
   AWS_FRONT_ALB_NUMBER: 1
@@ -156,4 +156,4 @@ jobs:
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} Consultora=${{ env.CONSULTORA }} ContainerPort=${{ env.SERVICE_PORT }} \
-        PrioridadListener=${{ env.AWS_ALB_PRIORITY }} NombreVPC={{ env.AWS_VPC_NAME }}"
+        PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }}"
