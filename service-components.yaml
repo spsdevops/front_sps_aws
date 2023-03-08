@@ -10,7 +10,7 @@ Parameters:
 
   ContainerPort:
     Type: Number
-    Default: 80
+    Default: 8000
     Description: port number exposed from the container image.
 
   FrontAlbNumber:
