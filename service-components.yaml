@@ -126,7 +126,7 @@ Resources:
           Values:
             - "Fn::Sub": ${FrontBasePath}*
       ListenerArn: !ImportValue
-        Fn::Sub: "${NombreVPC}-FrontAlbListener${FrontAlbNumber}"
+        Fn::Sub: "${NombreVPC}-FrontAlbListenerHTTPS${FrontAlbNumber}"
       Priority: !Ref PrioridadListener
 
   FrontSubDomain:
