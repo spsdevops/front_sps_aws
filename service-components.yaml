@@ -1,149 +1,186 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ""
+
+Description: "Componentes necesarios para exponer un Frontend"
+
 Parameters:
   Consultora:
     Type: String
     Description: Nombre de la consultora
-  ServiceName:
-    Type: String
-    Description: Nombre del microservicio
-    Default: paketo
-  TaskDefinitionARN:
-    Type: String
-    Description: ARN de Task Definition
-  HealthPath:
-    Type: String 
-    Description: Path de health del servicio  
-  APIBasePath:
-    Type: String 
-    Description: Basepath en API Gateway
-    Default: ""
+
   ContainerPort:
     Type: Number
+    Default: 80
     Description: port number exposed from the container image.
-    Default: 8001
+
+  FrontAlbNumber:
+    Type: String
+    Default: "1"
+
+  FrontBasePath:
+    Type: String
+    Default: ""
+    Description: Basepath en API Gateway
+
+  HealthPath:
+    Type: String
+    Description: Path de health del servicio
+
+  NombreVPC:
+    Type: String
+    Default: NMP-Servicios
+
   PrioridadListener:
     Type: Number
     Description: Prioridad de de la regla en el listener. No se debe repetir.
+
+  Replicas:
+    Type: Number
     Default: 1
+    Description: Numero de replicas que se crerán del contenedor
+
+  ServiceName:
+    Type: String
+    Default: paketo
+    Description: Nombre del microservicio
+
+  TaskDefinitionARN:
+    Type: String
+    Description: ARN de Task Definition
+
+  HostedZoneId:
+    Type: String
+    Description: Id de la zona en la que se creará el Dominio
+    Default: Z05524491VQ38G93MIPQD
 
 Resources:
-    ElasticLoadBalancingV2TargetGroup:
-        Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
-        Properties:
-            HealthCheckIntervalSeconds: 300
-            # Hardcode. Cambiar el path por el correspondiente para health
-            HealthCheckPath: !Ref HealthPath
-            Port: 80
-            Protocol: "HTTP"
-            HealthCheckPort: "traffic-port"
-            HealthCheckProtocol: "HTTP"
-            HealthCheckTimeoutSeconds: 5
-            UnhealthyThresholdCount: 2
-            TargetType: "ip"
-            Matcher: 
-                HttpCode: "200"
-            HealthyThresholdCount: 5
-            VpcId: !ImportValue ServicesVPC
-            Name: !Sub "${ServiceName}-1"          
-            HealthCheckEnabled: true
-            TargetGroupAttributes: 
-              - 
-                Key: "stickiness.enabled"
-                Value: "false"
-              - 
-                Key: "deregistration_delay.timeout_seconds"
-                Value: "300"
-              - 
-                Key: "stickiness.app_cookie.cookie_name"
-                Value: ""
-              - 
-                Key: "stickiness.type"
-                Value: "lb_cookie"
-              - 
-                Key: "stickiness.lb_cookie.duration_seconds"
-                Value: "86400"
-              - 
-                Key: "slow_start.duration_seconds"
-                Value: "0"
-              - 
-                Key: "stickiness.app_cookie.duration_seconds"
-                Value: "86400"
-              - 
-                Key: "load_balancing.algorithm.type"
-                Value: "round_robin"
+  TaskLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub /ecs/${ServiceName}
+      RetentionInDays: 30
 
-    ALBListenerProdRule:
-      Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
-      Properties:
-        Actions:
-          - Type: forward
-            ForwardConfig:
-              TargetGroups:
-                - TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
-                  Weight: 1
-        Conditions:
-          - 
-            Field: "path-pattern"
-            # Hardcode. Cambiar el path por el correspondiente. 
-            # Se recomienda que permanezca el wildcard.
-            Values: 
-              - !Sub "${APIBasePath}*"
-        ListenerArn: !ImportValue ElasticLoadBalancingV2Listener
-        Priority: !Ref PrioridadListener
+  EC2SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: SG para ms
+      GroupName: !Sub ${ServiceName}-sg
+      SecurityGroupEgress:
+        - CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: "10.0.0.0/16"
+          FromPort: !Ref ContainerPort
+          IpProtocol: tcp
+          ToPort: !Ref ContainerPort
+      VpcId: !ImportValue
+        "Fn::Sub": ${NombreVPC}-VPC
 
-    ECSService:
-        Type: "AWS::ECS::Service"
-        DependsOn:
-          - TaskLogGroup
-          - ALBListenerProdRule
-        Properties:
-            ServiceName: !Ref ServiceName
-            Cluster: !Sub "ECSCluster-${Consultora}"
-            LoadBalancers: 
-              - 
-                TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
-                ContainerName: !Ref ServiceName
-                ContainerPort: !Ref ContainerPort
-            DesiredCount: 1
-            LaunchType: "FARGATE"
-            PlatformVersion: "1.4.0"
-            TaskDefinition: !Ref TaskDefinitionARN
-            DeploymentConfiguration: 
-                MaximumPercent: 200
-                MinimumHealthyPercent: 100
-            NetworkConfiguration: 
-                AwsvpcConfiguration: 
-                    AssignPublicIp: "DISABLED"
-                    SecurityGroups: 
-                      - !Ref EC2SecurityGroup
-                    Subnets: 
-                      - !ImportValue PrivateSubnet1a
-            HealthCheckGracePeriodSeconds: 0
-            SchedulingStrategy: "REPLICA"
-            DeploymentController: 
-                Type: "ECS"
+  ElasticLoadBalancingV2TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: !Ref HealthPath
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: "200"
+      Name: !Sub ${ServiceName}-1
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: "false"
+        - Key: deregistration_delay.timeout_seconds
+          Value: "300"
+        - Key: stickiness.app_cookie.cookie_name
+          Value: ""
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: "86400"
+        - Key: slow_start.duration_seconds
+          Value: "0"
+        - Key: stickiness.app_cookie.duration_seconds
+          Value: "86400"
+        - Key: load_balancing.algorithm.type
+          Value: round_robin
+      TargetType: ip
+      UnhealthyThresholdCount: 2
+      VpcId: !ImportValue
+        "Fn::Sub": ${NombreVPC}-VPC
 
-    EC2SecurityGroup:
-        Type: "AWS::EC2::SecurityGroup"
-        Properties:
-            GroupDescription: "SG para ms"
-            GroupName: !Sub ${ServiceName}-sg
-            VpcId: !ImportValue ServicesVPC
-            SecurityGroupIngress: 
-              - 
-                SourceSecurityGroupId: !ImportValue VPCDefaultSecurityGroup
-                SourceSecurityGroupOwnerId: !Ref AWS::AccountId
-                FromPort: !Ref ContainerPort
-                IpProtocol: "tcp"
-                ToPort: !Ref ContainerPort
-            SecurityGroupEgress: 
-              - 
-                CidrIp: "0.0.0.0/0"
-                IpProtocol: "-1"
+  ALBListenerProdRule:
+    Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+    Properties:
+      Actions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
+                Weight: 1
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - "Fn::Sub": ${FrontBasePath}*
+      ListenerArn: !ImportValue
+        Fn::Sub: "${NombreVPC}-FrontAlbListener${FrontAlbNumber}"
+      Priority: !Ref PrioridadListener
 
-    TaskLogGroup:
-      Type: 'AWS::Logs::LogGroup'
-      Properties:
-        LogGroupName: !Sub '/ecs/${ServiceName}'
-        RetentionInDays: 30
+  FrontSubDomain:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Comment: !Sub "Subdominio para Frontend ${ServiceName}"
+      RecordSets:
+        - Name: hello.front.test.timelineage.site
+          Type: A
+          AliasTarget:
+            DNSName:
+              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbDNS${FrontAlbNumber}"
+            #EvaluateTargetHealth: true
+            HostedZoneId:
+              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbHostedZone${FrontAlbNumber}"
+
+  FrontACMCertificate: 
+    DependsOn: FrontSubDomain
+    Type: "AWS::CertificateManager::Certificate"
+    Properties: 
+      DomainName: hello.front.test.timelineage.site
+      DomainValidationOptions:
+            - DomainName: www.hello.front.test.timelineage.site
+              HostedZoneId: !Ref HostedZoneId
+      ValidationMethod: DNS
+
+  ECSService:
+    Type: "AWS::ECS::Service"
+    DependsOn:
+      - TaskLogGroup
+      - ALBListenerProdRule
+    Properties:
+      Cluster: !Sub ECSCluster-${Consultora}
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      DesiredCount: !Ref Replicas
+      HealthCheckGracePeriodSeconds: 0
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - Ref: EC2SecurityGroup
+          Subnets:
+            - "Fn::ImportValue": !Sub ${NombreVPC}-PrivateSubnet1a
+      PlatformVersion: "1.4.0"
+      SchedulingStrategy: REPLICA
+      ServiceName: !Ref ServiceName
+      TaskDefinition: !Ref TaskDefinitionARN
