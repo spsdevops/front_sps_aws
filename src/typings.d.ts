@@ -1,5 +1,7 @@
-/* SystemJS module definition */
-declare var module: NodeModule;
-interface NodeModule {
-  id: string;
+import { Modal } from 'bootstrap';
+
+declare global {
+  interface bootstrap {
+    Modal: Modal;
+  }
 }

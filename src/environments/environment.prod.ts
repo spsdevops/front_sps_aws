@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  api_url: 'https://conduit.productionready.io/api'
+  graphqlHost: 'https://nestjs-example-app.onrender.com/',
+  domain: 'https://angular-example-app.onrender.com',
 };

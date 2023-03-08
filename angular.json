@@ -3,135 +3,202 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "ang2-conduit": {
+    "angularexampleapp": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss"
+        }
+      },
       "root": "",
       "sourceRoot": "src",
-      "projectType": "application",
+      "prefix": "app",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
-            "outputPath": "dist",
+            "outputPath": "dist/",
             "index": "src/index.html",
             "main": "src/main.ts",
-            "tsConfig": "src/tsconfig.app.json",
             "polyfills": "src/polyfills.ts",
+            "tsConfig": "tsconfig.app.json",
+            "i18nMissingTranslation": "warning",
+            "inlineStyleLanguage": "scss",
+            "extractLicenses": false,
             "assets": [
-              "src/assets",
-              "src/favicon.ico"
+              {
+                "glob": "**/*",
+                "input": "src/assets/",
+                "output": "/assets/",
+                "ignore": ["base/*", "css/*", "js/*"]
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets/base",
+                "output": "/"
+              },
+              "src/manifest.webmanifest"
             ],
-            "styles": [
-              "src/styles.css"
-            ],
-            "scripts": [],
-            "aot": true
+            "styles": ["src/app/styles/index.scss"],
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "./node_modules",
+                "src/app/styles/abstracts",
+                "src/app/styles/base",
+                "src/app/styles/components"
+              ]
+            },
+            "allowedCommonJsDependencies": ["validator"],
+            "scripts": []
           },
           "configurations": {
             "production": {
-              "optimization": true,
-              "outputHashing": "all",
-              "sourceMap": false,
-              "namedChunks": false,
-              "extractLicenses": true,
-              "vendorChunk": false,
-              "buildOptimizer": true,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "700kb",
+                  "maximumError": "800Kb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "2kb",
+                  "maximumError": "45kb"
+                }
+              ],
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "budgets": [
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "6kb"
-                }
-              ]
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              },
+              "outputHashing": "all",
+              "localize": ["es", "en"]
+            },
+            "development-en": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "vendorChunk": true,
+              "sourceMap": true,
+              "namedChunks": true
+            },
+            "development-es": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "vendorChunk": true,
+              "sourceMap": true,
+              "namedChunks": true,
+              "localize": ["es"]
             }
-          }
+          },
+          "defaultConfiguration": "production"
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
-          "options": {
-            "browserTarget": "ang2-conduit:build"
-          },
           "configurations": {
             "production": {
-              "browserTarget": "ang2-conduit:build:production"
+              "browserTarget": "angularexampleapp:build:production"
+            },
+            "development-en": {
+              "browserTarget": "angularexampleapp:build:development-en"
+            },
+            "development-es": {
+              "browserTarget": "angularexampleapp:build:development-es"
             }
-          }
+          },
+          "defaultConfiguration": "development-en"
         },
         "extract-i18n": {
-          "builder": "@angular-devkit/build-angular:extract-i18n",
+          "builder": "ng-extract-i18n-merge:ng-extract-i18n-merge",
           "options": {
-            "browserTarget": "ang2-conduit:build"
+            "browserTarget": "angularexampleapp:build",
+            "format": "xlf",
+            "outputPath": "src/locale",
+            "targetFiles": ["messages.es.xlf"]
           }
         },
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
             "main": "src/test.ts",
-            "karmaConfig": "./karma.conf.js",
             "polyfills": "src/polyfills.ts",
-            "tsConfig": "src/tsconfig.spec.json",
-            "scripts": [],
-            "styles": [
-              "src/styles.css"
-            ],
-            "assets": [
-              "src/assets",
-              "src/favicon.ico"
-            ]
+            "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js",
+            "inlineStyleLanguage": "scss",
+            "assets": ["src/assets", "src/manifest.webmanifest"],
+            "styles": ["src/app/styles/index.scss"],
+            "stylePreprocessorOptions": {
+              "includePaths": [
+                "./node_modules",
+                "src/app/styles/abstracts",
+                "src/app/styles/base",
+                "src/app/styles/components"
+              ]
+            },
+            "scripts": []
           }
         },
         "lint": {
-          "builder": "@angular-devkit/build-angular:tslint",
+          "builder": "@angular-eslint/builder:lint",
           "options": {
-            "tsConfig": [
-              "src/tsconfig.app.json",
-              "src/tsconfig.spec.json"
-            ],
-            "exclude": [
-              "**/node_modules/**"
-            ]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
+          }
+        },
+        "cypress-run": {
+          "builder": "@cypress/schematic:cypress",
+          "options": {
+            "devServerTarget": "angularexampleapp:serve"
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "angularexampleapp:serve:production"
+            }
+          }
+        },
+        "cypress-open": {
+          "builder": "@cypress/schematic:cypress",
+          "options": {
+            "watch": true,
+            "headless": false
+          }
+        },
+        "e2e": {
+          "builder": "@cypress/schematic:cypress",
+          "options": {
+            "devServerTarget": "angularexampleapp:serve",
+            "watch": true,
+            "headless": false
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "angularexampleapp:serve:production"
+            }
           }
         }
-      }
-    },
-    "ang2-conduit-e2e": {
-      "root": "e2e",
-      "sourceRoot": "e2e",
-      "projectType": "application",
-      "architect": {
-        "e2e": {
-          "builder": "@angular-devkit/build-angular:protractor",
-          "options": {
-            "protractorConfig": "./protractor.conf.js",
-            "devServerTarget": "ang2-conduit:serve"
-          }
+      },
+      "i18n": {
+        "sourceLocale": {
+          "code": "en",
+          "baseHref": "/"
         },
-        "lint": {
-          "builder": "@angular-devkit/build-angular:tslint",
-          "options": {
-            "tsConfig": [
-              "e2e/tsconfig.e2e.json"
-            ],
-            "exclude": [
-              "**/node_modules/**"
-            ]
+        "locales": {
+          "es": {
+            "translation": "src/locale/messages.es.xlf",
+            "baseHref": "/es/"
           }
         }
       }
     }
   },
-  "defaultProject": "ang2-conduit",
-  "schematics": {
-    "@schematics/angular:component": {
-      "prefix": "app",
-      "style": "css"
-    },
-    "@schematics/angular:directive": {
-      "prefix": "app"
-    }
+  "cli": {
+    "analytics": "49e1320d-9031-4d19-bb7c-2d84a0f2fd49",
+    "schematicCollections": ["@angular-eslint/schematics"]
   }
 }
