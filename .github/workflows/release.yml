@@ -137,12 +137,6 @@ jobs:
       with: 
         version: ${{ env.AWS_SAM_VERSION }}
 
-    - name: Crear bucket de SAM si no existe
-      run: |
-        aws s3api head-bucket --bucket "sam-bucket-paketo" 2>/dev/null || aws s3 mb s3://sam-bucket-paketo
-        echo "Habilitando versionamiento"
-        aws s3api put-bucket-versioning --bucket "sam-bucket-paketo" --versioning-configuration Status=Enabled || echo "No se pudo realizar la operación"
-
     - name: Crear/Actualizar servicio ECS
       run: |
         sam deploy \
@@ -151,7 +145,7 @@ jobs:
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
-        --s3-bucket sam-bucket-paketo \
+        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
         --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
