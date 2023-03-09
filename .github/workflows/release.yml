@@ -14,14 +14,13 @@ on:
 
 env:
   
-  CONSULTORA: hello-world
-  
   SERVICE_NAME: front-hello-world
   SERVICE_PORT: 8000
   SERVICE_BASE_PATH: /
   SERVICE_HEALTH_PATH: /
   SERVICE_DOMAIN: test.com
 
+  AWS_ECS_CLUSTER: hello-world
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
   AWS_VPC_NAME: NMP-Servicios
@@ -154,7 +153,7 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-paketo \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.CONSULTORA }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
-        HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} Consultora=${{ env.CONSULTORA }} ContainerPort=${{ env.SERVICE_PORT }} \
+        HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} AWS_ECS_CLUSTER=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
         PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }}"
