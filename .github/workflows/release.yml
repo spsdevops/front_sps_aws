@@ -86,10 +86,10 @@ jobs:
         jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
-        jq -r '.taskRoleArn |= "${{ secrets.TASK_EXECUTION_ROLE }}"' task-definition.json > tmp.json
+        jq -r '.taskRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
-        jq -r '.executionRoleArn |= "${{ secrets.TASK_EXECUTION_ROLE }}"' task-definition.json > tmp.json
+        jq -r '.executionRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
         
         jq -r '.containerDefinitions[].name |= "${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
