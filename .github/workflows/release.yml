@@ -20,9 +20,12 @@ env:
   SERVICE_HEALTH_PATH: /
   SERVICE_DOMAIN: test.com
 
-  AWS_ECS_CLUSTER: test
+  AWS_ECS_CLUSTER: sps
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
+  AWS_R53_BASE_DOMAIN: "test.timelineage.site"
+  AWS_R53_SUB_DOMAIN: "webs"
+  AWS_R53_HOSTED_ZONE_ID: "Z05524491VQ38G93MIPQD"
   AWS_VPC_NAME: NMP-Servicios
   AWS_DEPLOY_REGION: us-east-2
   AWS_SAM_VERSION: 1.37.0
@@ -31,6 +34,7 @@ env:
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
   BUILDPACK_ENV_FILE: .buildpackenv
 
+  SONAR_PROJECT_KEY: test_front_local
   
 jobs:
 
@@ -46,6 +50,17 @@ jobs:
       run: |
         pip install cfn-lint==0.73.2
         cfn-lint service-components.yaml
+
+    - name: SonarQube Scan
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONARQUBE_HOST }}
+      with:
+        args: >
+          -Dsonar.sources=.
+          -Dsonar.projectKey=${{env.SONAR_PROJECT_KEY}}
+
 
     - uses: docker/login-action@v2
       with:
@@ -106,7 +121,8 @@ jobs:
 
         jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.SERVICE_PORT }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
-
+        
+        sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
 
     - name: Render Amazon ECS Task Definition
       id: render-task-definition
@@ -150,4 +166,5 @@ jobs:
         --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} ClusterName=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
-        PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }}"
+        PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }} SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}  \
+        Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} NumeroBalanceador=${{ env.AWS_FRONT_ALB_NUMBER }}"

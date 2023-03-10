@@ -13,14 +13,30 @@ Parameters:
     Default: 8000
     Description: port number exposed from the container image.
 
-  FrontAlbNumber:
+  NumeroBalanceador:
     Type: String
     Default: "1"
 
-  FrontDomain:
+  DominioBase:
     Type: String
-    Default: "hello.fronts1.test.timelineage.site"
-    Description: Dominio en el que se expondrá el Frontend
+    Default: "test.timelineage.site"
+    Description: "<HTTPS> Dominio base (el de la HostedZone). Ejemplo: test.timelineage.site"
+
+  Route53HostedZoneId:
+    Default: "Z05524491VQ38G93MIPQD"
+    Type: String
+    Description: "<HTTPS> ID de la HostedZone dueña del dominio base. Ejemplo: test.timelineage.site - Z05524491VQ38G93MIPQD"
+
+  SubdominioBalanceador:
+    Default: "webs1"
+    Type: String
+    Description: "<HTTPS> Subdominio del balanceador. Ejemplo: webs1"
+
+  WebPath:
+    Type: String
+    Description: "<HTTP> Path en el que escucha tu aplicación por HTTP. Ejemplo: /test"
+    Default: ""
+
 
   HealthPath:
     Type: String
@@ -43,16 +59,20 @@ Parameters:
     Type: String
     Description: ARN de Task Definition
 
-  HostedZoneId:
-    Type: String
-    Description: Id de la zona en la que se creará el Dominio
-    Default: Z05524491VQ38G93MIPQD
+
+Conditions:
+  NoDominioBase: !Equals [ !Ref Route53HostedZoneId, ""]
+  NoRoute53HostedZoneId: !Equals [ !Ref Route53HostedZoneId, ""]
+  NoSubdominioBalanceador: !Equals [ !Ref SubdominioBalanceador, ""]
+  NoHTTPS: !Or [Condition: NoDominioBase, Condition: NoRoute53HostedZoneId, Condition: NoSubdominioBalanceador] 
+  HTTPS: !Not [Condition: NoHTTPS]
 
 Resources:
+  
   TaskLogGroup:
     Type: "AWS::Logs::LogGroup"
     Properties:
-      LogGroupName: !Sub /ecs/${ServiceName}
+      LogGroupName: !Sub /ecs/${ClusterName}/${ServiceName}
       RetentionInDays: 30
 
   EC2SecurityGroup:
@@ -108,7 +128,8 @@ Resources:
       VpcId: !ImportValue
         "Fn::Sub": ${NombreVPC}-VPC
 
-  FrontALBListenerRuleHTTPS:
+  FrontALBListenerRuleHTTP:
+    Condition: NoHTTPS
     Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
     Properties:
       Actions:
@@ -118,14 +139,16 @@ Resources:
               - TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
                 Weight: 1
       Conditions:
-        - Field: host-header
-          Values:
-            - "Fn::Sub": "${FrontDomain}"
-      ListenerArn: !ImportValue
-        Fn::Sub: "${NombreVPC}-FrontAlbListenerHTTPS${FrontAlbNumber}"
+        - 
+          Field: path-pattern
+          Values: 
+            - !Sub "${WebPath}*"
+      ListenerArn: 
+        Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTP${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
 
-  FrontALBListenerRuleHTTP:
+  FrontALBListenerRuleHTTPS:
+    Condition: HTTPS
     Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
     Properties:
       Actions:
@@ -137,34 +160,68 @@ Resources:
       Conditions:
         - Field: host-header
           Values:
-            - "Fn::Sub": "${FrontDomain}"
-      ListenerArn: !ImportValue
-        Fn::Sub: "${NombreVPC}-FrontAlbListenerHTTP${FrontAlbNumber}"
+            - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
+      ListenerArn:
+        Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
 
   FrontSubDomain:
+    Condition: HTTPS
     Type: AWS::Route53::RecordSetGroup
     Properties:
-      HostedZoneId: !Ref HostedZoneId
+      HostedZoneId: !Ref Route53HostedZoneId
       Comment: !Sub "Subdominio para Frontend ${ServiceName}"
       RecordSets:
-        - Name: !Ref FrontDomain
+        - Name: !Sub "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
           Type: A
           AliasTarget:
             DNSName:
-              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbDNS${FrontAlbNumber}"
+              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbDNS${NumeroBalanceador}"
             EvaluateTargetHealth: true
             HostedZoneId:
-              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbHostedZone${FrontAlbNumber}"
+              Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbHostedZone${NumeroBalanceador}"
 
-  ECSService:
+  ECSServiceHTTP:
+    Condition: NoHTTPS
+    Type: "AWS::ECS::Service"
+    DependsOn:
+      - TaskLogGroup
+      - FrontALBListenerRuleHTTP
+    Properties:
+      ServiceName: !Sub "${ServiceName}-http"
+      Cluster: !Ref ClusterName
+      LoadBalancers: 
+        - 
+          TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
+          ContainerName: !Ref ServiceName
+          ContainerPort: !Ref ContainerPort
+      DesiredCount: 1
+      LaunchType: "FARGATE"
+      PlatformVersion: "1.4.0"
+      TaskDefinition: !Ref TaskDefinitionARN
+      DeploymentConfiguration: 
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      NetworkConfiguration: 
+        AwsvpcConfiguration: 
+          AssignPublicIp: "DISABLED"
+          SecurityGroups: 
+            - !Ref EC2SecurityGroup
+          Subnets: 
+            - Fn::ImportValue: !Sub "${NombreVPC}-PrivateSubnet1a"
+      HealthCheckGracePeriodSeconds: 0
+      SchedulingStrategy: "REPLICA"
+      DeploymentController: 
+          Type: "ECS"
+
+  ECSServiceHTTPS:
+    Condition: HTTPS
     Type: "AWS::ECS::Service"
     DependsOn:
       - TaskLogGroup
       - FrontALBListenerRuleHTTPS
-      - FrontALBListenerRuleHTTP
     Properties:
-      ServiceName: !Ref ServiceName
+      ServiceName: !Sub "${ServiceName}-https"
       Cluster: !Ref ClusterName
       LoadBalancers: 
         - 
