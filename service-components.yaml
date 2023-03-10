@@ -19,7 +19,7 @@ Parameters:
 
   FrontDomain:
     Type: String
-    Default: "hello.front.test.timelineage.site"
+    Default: "hello.fronts1.test.timelineage.site"
     Description: Dominio en el que se expondrá el Frontend
 
   HealthPath:
