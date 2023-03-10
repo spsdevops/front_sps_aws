@@ -98,7 +98,7 @@ jobs:
         jq -r '.family |= "${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
-        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-group" |= "/ecs/${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
+        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-group" |= "/ecs/${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
         jq -r '.containerDefinitions[].logConfiguration.options."awslogs-region" |= "${{ env.AWS_DEPLOY_REGION }}"' task-definition.json > tmp.json
