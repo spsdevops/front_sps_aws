@@ -4,7 +4,7 @@ Description: "Componentes necesarios para exponer un Frontend"
 
 Parameters:
 
-  Cluster:
+  ClusterName:
     Type: String
     Description: Nombre del cluster en el que se creará el Frontend
 
@@ -165,7 +165,7 @@ Resources:
       - FrontALBListenerRuleHTTP
     Properties:
       ServiceName: !Ref ServiceName
-      Cluster: !Ref Cluster
+      Cluster: !Ref ClusterName
       LoadBalancers: 
         - 
           TargetGroupArn: !Ref ElasticLoadBalancingV2TargetGroup
