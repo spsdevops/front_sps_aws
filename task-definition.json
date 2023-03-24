@@ -39,12 +39,7 @@
             "environmentFiles": [],
             "mountPoints": [],
             "volumesFrom": [],
-            "secrets": [
-                    {
-                        "name": "TEST",
-                        "valueFrom": "/CLUSTER_NAME/TEST"
-                    }                  
-            ],
+            "secrets": [],
             "dnsServers": [],
             "dnsSearchDomains": [],
             "extraHosts": [],
