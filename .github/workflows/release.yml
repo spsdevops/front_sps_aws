@@ -47,7 +47,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1
-           
+
     - name: "CFN Lint - Linter de Cloudformation Frontend"
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
       run: |
@@ -62,6 +62,7 @@ jobs:
         cfn-lint api-gateway.yaml
 
     - uses: actions/setup-java@v3
+      if: ${{ env.JAVA_BUILD_TOOL != 'maven' && env.JAVA_BUILD_TOOL != 'gradle'}}
       with:
         distribution: temurin
         java-version: 11
