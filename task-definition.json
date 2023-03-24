@@ -17,11 +17,34 @@
             "essential": true,
             "entryPoint": [],
             "command": [],
-            "environment": [],
+            "environment": [{
+                "name": "LOG_LEVEL",
+                "value": "info"
+            },{
+                "name": "CONTEXT_NAME",
+                "value": "api-test"
+            },{
+                "name": "CONTEXT_VERSION",
+                "value": "v1"
+            },{
+                "name": "DECODE_FILE",
+                "value": "ISO-8859-1"
+            },{
+                "name": "NODE_ENV",
+                "value": "dev"
+            },{
+                "name": "PORT",
+                "value": "8000"
+            }],
             "environmentFiles": [],
             "mountPoints": [],
             "volumesFrom": [],
-            "secrets": [],
+            "secrets": [
+                    {
+                        "name": "TEST",
+                        "valueFrom": "/CLUSTER_NAME/TEST"
+                    }                  
+            ],
             "dnsServers": [],
             "dnsSearchDomains": [],
             "extraHosts": [],
