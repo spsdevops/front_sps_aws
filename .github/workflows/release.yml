@@ -103,7 +103,7 @@ jobs:
 
     # Configurar paketo https://paketo.io/
     - id: setup-pack
-      uses: buildpacks/github-actions/setup-pack@v4.9.0
+      uses: buildpacks/github-actions/setup-pack@v5.0.1
 
     - name: build image Java
       if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
