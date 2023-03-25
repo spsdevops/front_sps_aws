@@ -29,6 +29,7 @@ env:
   AWS_VPC_NAME: NMP-Servicios
   AWS_DEPLOY_REGION: us-east-2
   AWS_SAM_VERSION: 1.37.0
+  JAVA_VERSION: 11
   
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
@@ -65,7 +66,7 @@ jobs:
       if: ${{ env.JAVA_BUILD_TOOL != 'maven' && env.JAVA_BUILD_TOOL != 'gradle'}}
       with:
         distribution: temurin
-        java-version: 11
+        java-version: ${{env.JAVA_VERSION}}
         cache: ${{env.JAVA_BUILD_TOOL}}
 
     - name: Setup Gradle
