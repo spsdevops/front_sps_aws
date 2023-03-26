@@ -1,0 +1,257 @@
+name: Master
+
+permissions:
+  id-token: write
+  contents: read    
+
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+
+env:
+
+  SERVICE_NAME: front-hello-world
+  SERVICE_PORT: 8000
+  SERVICE_BASE_PATH: /
+  SERVICE_HEALTH_PATH: /
+  
+  SONAR_PROJECT_KEY: front-hello-world
+
+  AWS_ECS_CLUSTER: hello-world
+  AWS_FRONT_ALB_NUMBER: 1
+  AWS_FRONT_ALB_PRIORITY: 1
+  AWS_R53_SUB_DOMAIN: "webs"
+  AWS_R53_BASE_DOMAIN: "test.timelineage.site"
+  AWS_R53_HOSTED_ZONE_ID: "Z05524491VQ38G93MIPQD"
+  AWS_VPC_NAME: NMP-Servicios
+  AWS_DEPLOY_REGION: us-east-2
+  AWS_SAM_VERSION: 1.37.0
+    
+  BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs
+  BUILDPACK_BUILDER: paketobuildpacks/builder:base
+  BUILDPACK_ENV_FILE: .buildpackenv
+
+  
+jobs:
+  BuildDeploy:
+    name: Build and deploy
+    runs-on:
+    - ubuntu-latest
+    steps:
+    - id: checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+           
+    - name: "CFN Lint - Linter de Cloudformation Frontend"
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
+      run: |
+        pip install cfn-lint==0.73.2
+        cfn-lint service-components.yaml
+
+    - name: "CFN Lint - Linter de Cloudformation Backend"
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
+      run: |
+        pip install cfn-lint==0.73.2
+        cfn-lint service-components.yaml
+        cfn-lint api-gateway.yaml
+
+    - uses: actions/setup-java@v3
+      if: ${{ env.JAVA_BUILD_TOOL == 'maven' || env.JAVA_BUILD_TOOL == 'gradle'}}
+      with:
+        distribution: temurin
+        java-version: ${{env.JAVA_VERSION}}
+        cache: ${{env.JAVA_BUILD_TOOL}}
+
+    - name: Setup Gradle
+      if: ${{ env.JAVA_BUILD_TOOL == 'gradle'}}
+      uses: gradle/gradle-build-action@v2
+    
+    - name: Execute Gradle SonarQube
+      if: ${{ env.JAVA_BUILD_TOOL == 'gradle'}}
+      run: |
+        chmod +x gradlew
+        sudo ./gradlew sonar -D "sonar.projectKey=${{env.SONAR_PROJECT_KEY}}" -D "sonar.host.url=${{ secrets.SONARQUBE_HOST }}" -D "sonar.login=${{ secrets.SONARQUBE_TOKEN }}" -D "sonar.projectName=${{env.SONAR_PROJECT_KEY}}"
+
+    - name: Execute Maven SonarQube
+      if: ${{ env.JAVA_BUILD_TOOL == 'maven'}}
+      run: |
+        mvn clean verify sonar:sonar -D "sonar.projectKey=${{env.SONAR_PROJECT_KEY}}" -D "sonar.host.url=${{ secrets.SONARQUBE_HOST }}" -D "sonar.login=${{ secrets.SONARQUBE_TOKEN }}" -D "sonar.projectName=${{env.SONAR_PROJECT_KEY}}"
+        
+    
+    - name: SonarQube Scan
+      if: ${{ env.JAVA_BUILD_TOOL != 'maven' && env.JAVA_BUILD_TOOL != 'gradle'}}
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONARQUBE_HOST }}
+      with:
+        args: >
+          -Dsonar.sources=.
+          -Dsonar.projectKey=${{env.SONAR_PROJECT_KEY}}
+
+    - uses: docker/login-action@v2
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKER_HUB_USER }}
+        password: ${{ secrets.DOCKER_HUB_PASS }}
+
+    # Configurar paketo https://paketo.io/
+    - id: setup-pack
+      uses: buildpacks/github-actions/setup-pack@v4.9.0
+
+    - name: build image Java
+      if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
+      run: |
+        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack paketo-buildpacks/eclipse-openj9 --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
+        --env-file ${{ env.BUILDPACK_ENV_FILE }}
+
+    - name: build image
+      if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
+      run: |
+        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
+        --env-file ${{ env.BUILDPACK_ENV_FILE }}
+
+    - name: Push Image
+      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+    # Autenticar en AWS sin utilizar secretos
+    - name: Configure AWS Deploy Role 
+      uses: aws-actions/configure-aws-credentials@v1-node16
+      with: 
+        aws-region: ${{ env.AWS_DEPLOY_REGION }}
+        role-to-assume: arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
+        role-session-name: ${{ github.event.repository.name }}
+
+    - name: Reemplazo de ARN's en Task Definition
+      run: |
+        jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.taskRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.executionRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+        
+        jq -r '.containerDefinitions[].name |= "${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.family |= "${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-group" |= "/ecs/${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].logConfiguration.options."awslogs-region" |= "${{ env.AWS_DEPLOY_REGION }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.SERVICE_PORT }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+        
+        sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
+
+    - name: Render Amazon ECS Task Definition
+      id: render-task-definition
+      uses: aws-actions/amazon-ecs-render-task-definition@v1 
+      with: 
+        task-definition: task-definition.json
+        container-name: ${{ env.SERVICE_NAME }}
+        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+    - name: Deploy Amazon ECS task definition 
+      id: deploy-task-definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+
+    - name: Task Definition ARN
+      run: echo ${{ steps.deploy-task-definition.outputs.task-definition-arn }}
+
+    - name: Install SAM CLI
+      uses: aws-actions/setup-sam@v2
+      with: 
+        version: ${{ env.AWS_SAM_VERSION }}
+
+    - name: Crear/Actualizar servicio ECS Frontend
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
+      run: |
+        sam deploy \
+        -t service-components.yaml \
+        --stack-name ${{ env.SERVICE_NAME }}-service \
+        --no-fail-on-empty-changeset  \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --no-confirm-changeset \
+        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-prefix ${{ env.SERVICE_NAME }}-service \
+        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
+        HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} ClusterName=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
+        PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }} SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}  \
+        Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} NumeroBalanceador=${{ env.AWS_FRONT_ALB_NUMBER }}"
+
+
+    - name: Crear/Actualizar servicio ECS Backend
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
+      run: |
+        sam deploy \
+        -t service-components.yaml \
+        --stack-name ${{ env.SERVICE_NAME }}-service \
+        --no-fail-on-empty-changeset  \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --no-confirm-changeset \
+        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-prefix ${{ env.SERVICE_NAME }}-service \
+        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
+        HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} ClusterName=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
+        PrioridadListener=${{ env.AWS_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }}"
+    
+    - name: Crear/Actualizar API Gateway
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
+      run: |
+        sam deploy \
+        -t api-gateway.yaml \
+        --stack-name ${{ env.SERVICE_NAME }}-api \
+        --no-fail-on-empty-changeset  \
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+        --no-confirm-changeset \
+        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-prefix ${{ env.SERVICE_NAME }}-api \
+        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
+        APIBasePath=${{ env.SERVICE_BASE_PATH}} NombreVPC=${{ env.AWS_VPC_NAME }} ClusterName=${{ env.AWS_ECS_CLUSTER }}"
+
+    - name: Agregar valores de API Gateway a SSM
+      if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
+      run: |
+        echo "Se obtiene APIKEY ID de los exports del stack"
+        APIKEY_ID=$(aws cloudformation --region ${{ env.AWS_DEPLOY_REGION }} describe-stacks --stack-name ${{ env.SERVICE_NAME }}-api \
+        --query 'Stacks[0].Outputs[?OutputKey==`ApiKey`].OutputValue' --output text)
+
+        echo "Se obtiene el API ID de los exports del stack"
+        API_ID=$(aws cloudformation --region ${{ env.AWS_DEPLOY_REGION }} describe-stacks --stack-name ${{ env.SERVICE_NAME }}-api \
+        --query 'Stacks[0].Outputs[?OutputKey==`Api`].OutputValue' --output text)
+
+        echo "Se obtiene el valor de la API Key"
+        APIKEY_QUOTES=$(aws apigateway get-api-key --api-key $APIKEY_ID --include-value --region ${{ env.AWS_DEPLOY_REGION }} --query 'value')
+        
+        temp="${APIKEY_QUOTES%\"}"
+        APIKEY="${temp#\"}"
+        ENDPOINT="https://$API_ID.execute-api.${{ env.AWS_DEPLOY_REGION }}.amazonaws.com/api"
+
+        SSM_CONTENT=$( jq -n \
+                          --arg ep "$ENDPOINT" \
+                          --arg ak "$APIKEY" \
+                          '{ENDPOINT: $ep, APIKEY: $ak}' )
+
+                  
+        echo "Se agrega API Key y endpoint en SSM"
+        aws ssm put-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-api --value \
+        "$SSM_CONTENT" --overwrite --type String --region ${{ env.AWS_DEPLOY_REGION }}
