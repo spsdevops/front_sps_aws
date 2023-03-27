@@ -82,18 +82,6 @@ jobs:
       run: |
         mvn clean verify sonar:sonar -D "sonar.projectKey=${{env.SONAR_PROJECT_KEY}}" -D "sonar.host.url=${{ secrets.SONARQUBE_HOST }}" -D "sonar.login=${{ secrets.SONARQUBE_TOKEN }}" -D "sonar.projectName=${{env.SONAR_PROJECT_KEY}}"
         
-    
-    - name: SonarQube Scan
-      if: ${{ env.JAVA_BUILD_TOOL != 'maven' && env.JAVA_BUILD_TOOL != 'gradle'}}
-      uses: sonarsource/sonarqube-scan-action@master
-      env:
-        SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONARQUBE_HOST }}
-      with:
-        args: >
-          -Dsonar.sources=.
-          -Dsonar.projectKey=${{env.SONAR_PROJECT_KEY}}
-
     - uses: docker/login-action@v2
       with:
         registry: docker.io
