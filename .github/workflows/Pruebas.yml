@@ -21,7 +21,7 @@ env:
   
   SONAR_PROJECT_KEY: front-hello-world
 
-  AWS_ECS_CLUSTER: hello-world
+  AWS_ECS_CLUSTER: testing
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
   AWS_R53_SUB_DOMAIN: "webs"
