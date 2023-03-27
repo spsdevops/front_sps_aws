@@ -126,7 +126,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v1-node16
       with: 
         aws-region: ${{ env.AWS_DEPLOY_REGION }}
-        role-to-assume: arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
+        role-to-assume: arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
         role-session-name: ${{ github.event.repository.name }}
 
     - name: Reemplazo de ARN's en Task Definition
@@ -134,10 +134,10 @@ jobs:
         jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
-        jq -r '.taskRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
+        jq -r '.taskRoleArn |= "arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
-        jq -r '.executionRoleArn |= "arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
+        jq -r '.executionRoleArn |= "arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
         
         jq -r '.containerDefinitions[].name |= "${{ env.SERVICE_NAME }}"' task-definition.json > tmp.json
@@ -188,7 +188,7 @@ jobs:
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
         --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
@@ -206,7 +206,7 @@ jobs:
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
         --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
@@ -222,7 +222,7 @@ jobs:
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-api \
         --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
