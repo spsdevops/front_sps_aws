@@ -131,7 +131,7 @@ jobs:
 
     - name: Reemplazo de ARN's en Task Definition
       run: |
-        jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
+        jq -r '.containerDefinitions[].repositoryCredentials.credentialsParameter |= "${{ secrets.PROD_ARN_CREDENTIALS_DOCKERHUB }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
 
         jq -r '.taskRoleArn |= "arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/${{ env.AWS_ECS_CLUSTER }}-ECS-Role"' task-definition.json > tmp.json
