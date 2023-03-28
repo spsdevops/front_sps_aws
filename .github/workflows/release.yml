@@ -29,7 +29,8 @@ env:
   AWS_VPC_NAME: NMP-Servicios
   AWS_DEPLOY_REGION: us-east-2
   AWS_SAM_VERSION: 1.37.0
-  JAVA_VERSION: 11
+  JAVA_VERSION: ""
+  JAVA_BUILD_TOOL: ""
   
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
@@ -63,7 +64,7 @@ jobs:
         cfn-lint api-gateway.yaml
 
     - uses: actions/setup-java@v3
-      if: ${{ env.JAVA_BUILD_TOOL != 'maven' && env.JAVA_BUILD_TOOL != 'gradle'}}
+      if: ${{ env.JAVA_BUILD_TOOL == 'maven' || env.JAVA_BUILD_TOOL == 'gradle'}}
       with:
         distribution: temurin
         java-version: ${{env.JAVA_VERSION}}
