@@ -223,10 +223,6 @@ jobs:
         APIKEY_ID=$(aws cloudformation --region ${{ env.AWS_DEPLOY_REGION }} describe-stacks --stack-name ${{ env.SERVICE_NAME }}-api \
         --query 'Stacks[0].Outputs[?OutputKey==`ApiKey`].OutputValue' --output text)
 
-        echo "Se obtiene el API ID de los exports del stack"
-        API_ID=$(aws cloudformation --region ${{ env.AWS_DEPLOY_REGION }} describe-stacks --stack-name ${{ env.SERVICE_NAME }}-api \
-        --query 'Stacks[0].Outputs[?OutputKey==`Api`].OutputValue' --output text)
-
         echo "Se obtiene el valor de la API Key"
         APIKEY_QUOTES=$(aws apigateway get-api-key --api-key $APIKEY_ID --include-value --region ${{ env.AWS_DEPLOY_REGION }} --query 'value')
         
