@@ -247,7 +247,7 @@ jobs:
         
         temp="${APIKEY_QUOTES%\"}"
         APIKEY="${temp#\"}"
-        ENDPOINT="https://$API_ID.execute-api.${{ env.AWS_DEPLOY_REGION }}.amazonaws.com/api"
+        ENDPOINT="https://${{ env.SERVICE_NAME }}.apis${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}"
 
         SSM_CONTENT=$( jq -n \
                           --arg ep "$ENDPOINT" \
