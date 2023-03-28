@@ -257,4 +257,4 @@ jobs:
                   
         echo "Se agrega API Key y endpoint en SSM"
         aws ssm put-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-api --value \
-        "$SSM_CONTENT" --overwrite --type String --region ${{ env.AWS_DEPLOY_REGION }}
+        "$SSM_CONTENT" --overwrite --type SecureString --region ${{ env.AWS_DEPLOY_REGION }}
