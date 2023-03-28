@@ -8,7 +8,7 @@ permissions:
 on:
   push:
     branches:
-      - feat/**
+      - ftr/**
   workflow_dispatch:
 
 

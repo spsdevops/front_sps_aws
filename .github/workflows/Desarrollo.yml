@@ -8,7 +8,7 @@ permissions:
 on:
   push:
     branches:
-      - desarrollo
+      - dev
   workflow_dispatch:
 
 
