@@ -172,7 +172,7 @@ jobs:
       run: |
         sam deploy \
         -t service-components.yaml \
-        --stack-name ${{ env.SERVICE_NAME }}-service \
+        --stack-name service-${{ env.SERVICE_NAME }} \
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
@@ -190,7 +190,7 @@ jobs:
       run: |
         sam deploy \
         -t service-components.yaml \
-        --stack-name ${{ env.SERVICE_NAME }}-service \
+        --stack-name service-${{ env.SERVICE_NAME }} \
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
@@ -206,7 +206,7 @@ jobs:
       run: |
         sam deploy \
         -t api-gateway.yaml \
-        --stack-name ${{ env.SERVICE_NAME }}-api \
+        --stack-name api-${{ env.SERVICE_NAME }} \
         --no-fail-on-empty-changeset  \
         --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
         --no-confirm-changeset \
