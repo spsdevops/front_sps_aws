@@ -193,7 +193,7 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} clusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} ClusterName=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
         PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }} SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}  \
@@ -211,7 +211,7 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} clusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }} APIBasePath=${{ env.SERVICE_BASE_PATH}} ClusterName=${{ env.AWS_ECS_CLUSTER }} ContainerPort=${{ env.SERVICE_PORT }} \
         PrioridadListener=${{ env.AWS_ALB_PRIORITY }} NombreVPC=${{ env.AWS_VPC_NAME }}"
@@ -227,7 +227,7 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.DEV_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-api \
-        --tags "commit_hash=${{ github.sha }} cluster_ECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} clusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         APIBasePath=${{ env.SERVICE_BASE_PATH}} NombreVPC=${{ env.AWS_VPC_NAME }} ClusterName=${{ env.AWS_ECS_CLUSTER }}"
 
