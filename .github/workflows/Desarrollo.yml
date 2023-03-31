@@ -103,7 +103,7 @@ jobs:
     - name: build image Java
       if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
       run: |
-        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv
+        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
         pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
         --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack paketo-buildpacks/eclipse-openj9 --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
         --env-file ${{ env.BUILDPACK_ENV_FILE }}
@@ -111,7 +111,7 @@ jobs:
     - name: build image
       if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
       run: |
-        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv
+        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
         pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
         --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
         --env-file ${{ env.BUILDPACK_ENV_FILE }}
