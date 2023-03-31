@@ -105,6 +105,14 @@ jobs:
     - id: setup-pack
       uses: buildpacks/github-actions/setup-pack@v4.9.0
 
+    # Autenticar en AWS sin utilizar secretos
+    - name: Configure AWS Deploy Role 
+      uses: aws-actions/configure-aws-credentials@v1-node16
+      with: 
+        aws-region: ${{ env.AWS_DEPLOY_REGION }}
+        role-to-assume: arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
+        role-session-name: ${{ github.event.repository.name }}
+
     - name: build image Java
       if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
       run: |
