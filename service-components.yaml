@@ -200,11 +200,11 @@ Resources:
       PlatformVersion: "1.4.0"
       TaskDefinition: !Ref TaskDefinitionARN
       DeploymentConfiguration: 
-          MaximumPercent: 200
-          MinimumHealthyPercent: 100
-          DeploymentCircuitBreaker:
-            Enable: True
-            Rollback: False
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: True
+          Rollback: False
       NetworkConfiguration: 
         AwsvpcConfiguration: 
           AssignPublicIp: "DISABLED"
