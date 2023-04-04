@@ -209,7 +209,7 @@ jobs:
         Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} \
         DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} \
         NumeroBalanceador=${{ env.AWS_FRONT_ALB_NUMBER }} \
-        HealthCode=${{ env.SERVICE_HEALTH_CODE }} \"
+        HealthCode=${{ env.SERVICE_HEALTH_CODE }}"
 
 
     - name: Crear/Actualizar servicio ECS Backend
