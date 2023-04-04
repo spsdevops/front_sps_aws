@@ -269,6 +269,14 @@ jobs:
         echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
 
 
+    - name: URL del servicio
+      run: |
+        echo "Puedes consultar tu servicio en la siguiente URL "https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}""   
+        echo "-----------------" >> $GITHUB_STEP_SUMMARY
+        echo "## URL" >> $GITHUB_STEP_SUMMARY
+        echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
+
+
     - name: Agregar valores de API Gateway a SSM
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
       run: |
