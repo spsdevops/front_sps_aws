@@ -161,6 +161,10 @@ jobs:
         
         sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
 
+    - name: Importación de secretos del servicio
+      run: |
+        python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json        
+
     - name: Render Amazon ECS Task Definition
       id: render-task-definition
       uses: aws-actions/amazon-ecs-render-task-definition@v1 
