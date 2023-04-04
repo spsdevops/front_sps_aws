@@ -194,7 +194,10 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.TEST_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} ClusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} \
+        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
+        repo=${{ github.repository }} \
+        service=${{ env.SERVICE_NAME }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
         TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }}  \
@@ -220,7 +223,10 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.TEST_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} ClusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} \
+        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
+        repo=${{ github.repository }} \
+        service=${{ env.SERVICE_NAME }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
         TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         HealthPath=${{ env.SERVICE_HEALTH_PATH }} \
@@ -243,7 +249,10 @@ jobs:
         --no-confirm-changeset \
         --s3-bucket sam-bucket-${{secrets.TEST_AWS_ACCOUNT_ID}} \
         --s3-prefix ${{ env.SERVICE_NAME }}-api \
-        --tags "commit_hash=${{ github.sha }} ClusterECS=${{ env.AWS_ECS_CLUSTER }} repo=${{ github.repository }}" \
+        --tags "commit_hash=${{ github.sha }} \
+        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
+        repo=${{ github.repository }} \
+        service=${{ env.SERVICE_NAME }}" \
         --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
         TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
         NombreVPC=${{ env.AWS_VPC_NAME }} \

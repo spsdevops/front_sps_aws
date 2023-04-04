@@ -108,7 +108,6 @@ Resources:
       HealthyThresholdCount: 5
       Matcher:
         HttpCode: !Ref HealthCode
-      Name: !Sub ${ServiceName}-1
       Port: 80
       Protocol: HTTP
       TargetGroupAttributes:
