@@ -14,14 +14,16 @@ on:
 
 env:
 
+  AWS_ECS_CLUSTER: hello-world
+
   SERVICE_NAME: front-hello-world
   SERVICE_PORT: 8000
-  SERVICE_BASE_PATH: /
   SERVICE_HEALTH_PATH: /
+  SERVICE_HEALTH_CODE: 200
   
   SONAR_PROJECT_KEY: front-hello-world
+  SONAR_SCAN: false
 
-  AWS_ECS_CLUSTER: hello-world
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
   AWS_R53_SUB_DOMAIN: "webs"
@@ -30,7 +32,7 @@ env:
   AWS_VPC_NAME: NMP-Servicios
   AWS_DEPLOY_REGION: us-east-2
   AWS_SAM_VERSION: 1.37.0
-    
+
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
   BUILDPACK_ENV_FILE: .buildpackenv
