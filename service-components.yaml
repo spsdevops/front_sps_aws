@@ -42,6 +42,11 @@ Parameters:
     Type: String
     Description: Path de health del servicio
 
+  HealthCode:
+    Type: String
+    Description: Path de health del servicio
+    Default: 200
+
   NombreVPC:
     Type: String
     Default: NMP-Servicios
@@ -102,7 +107,7 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 5
       Matcher:
-        HttpCode: "200"
+        HttpCode: !Ref HealthCode
       Name: !Sub ${ServiceName}-1
       Port: 80
       Protocol: HTTP
