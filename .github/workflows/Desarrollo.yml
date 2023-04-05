@@ -114,24 +114,20 @@ jobs:
         role-to-assume: arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
         role-session-name: ${{ github.event.repository.name }}
 
-    - name: build image Java
-      if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
-      run: |
-        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
-        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack paketo-buildpacks/eclipse-openj9 --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
-
-    - name: build image
+    - name: Build image
       if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
       run: |
         aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
-        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
+        buildpacks=()
+        for bp in $BUILDPACK_LANGUAGE; do args+=(--buildpack "$bp"); done
+        echo "Buikdpack a usar: ${args[@]}"
+        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev \
+        --builder ${{ env.BUILDPACK_BUILDER }} \
+        --path . \
+        --env-file ${{ env.BUILDPACK_ENV_FILE }} "${args[@]}"
 
     - name: Push Image
-      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
 
     - name: Reemplazo de ARN's en Task Definition
       run: |
@@ -158,16 +154,17 @@ jobs:
 
         jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.SERVICE_PORT }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
-        
+
         jq -r '.containerDefinitions[].environment += [{"name": "BIND", "value": "0.0.0.0"}]' task-definition.json > tmp.json
         mv tmp.json task-definition.json
-
+        
         sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
 
         cat task-definition.json
     - name: Importación de secretos del servicio
       run: |
-        python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json        
+        python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json
+        cat task-definition.json
 
     - name: Render Amazon ECS Task Definition
       id: render-task-definition
@@ -175,7 +172,7 @@ jobs:
       with: 
         task-definition: task-definition.json
         container-name: ${{ env.SERVICE_NAME }}
-        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
 
     - name: Deploy Amazon ECS task definition 
       id: deploy-task-definition
@@ -275,15 +272,6 @@ jobs:
         echo "-----------------" >> $GITHUB_STEP_SUMMARY
         echo "## URL" >> $GITHUB_STEP_SUMMARY
         echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
-
-
-    - name: URL del servicio
-      run: |
-        echo "Puedes consultar tu servicio en la siguiente URL "https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}""   
-        echo "-----------------" >> $GITHUB_STEP_SUMMARY
-        echo "## URL" >> $GITHUB_STEP_SUMMARY
-        echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
-
 
     - name: Agregar valores de API Gateway a SSM
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
