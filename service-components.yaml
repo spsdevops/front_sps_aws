@@ -165,6 +165,13 @@ Resources:
         - Field: host-header
           Values:
             - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
+            - ejemplo.com.mx
+        - HostHeaderConfig:
+            Values:
+              - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
+              - ejemplo.com.mx
+          Condition: host-header
+
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
