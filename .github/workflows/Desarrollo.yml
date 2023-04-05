@@ -159,8 +159,12 @@ jobs:
         jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.SERVICE_PORT }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
         
+        jq -r '.containerDefinitions[].environment += [{"name": "BIND", "value": "0.0.0.0"}]' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
         sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
 
+        cat task-definition.json
     - name: Importación de secretos del servicio
       run: |
         python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json        
