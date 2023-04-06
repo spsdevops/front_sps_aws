@@ -37,7 +37,7 @@ env:
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
   BUILDPACK_ENV_FILE: .buildpackenv
 
-  OPTIONAL_DOMAIN: "ejemplo.com"
+  OPTIONAL_DOMAIN:
 
   
 jobs:
