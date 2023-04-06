@@ -63,9 +63,9 @@ Parameters:
     Type: String
     Description: ARN de Task Definition
   
-  DominioOpcional:
-    Type: String
-    Description: Valor opcional para la condición OR en listener rule
+  # DominioOpcional:
+  #   Type: String
+  #   Description: Valor opcional para la condición OR en listener rule
 
 
 Conditions:
@@ -74,7 +74,7 @@ Conditions:
   NoSubdominioBalanceador: !Equals [ !Ref SubdominioBalanceador, ""]
   NoHTTPS: !Or [Condition: NoDominioBase, Condition: NoRoute53HostedZoneId, Condition: NoSubdominioBalanceador] 
   HTTPS: !Not [Condition: NoHTTPS]
-  DominioVacio: !Equals [!Ref DominioOpcional, ""]
+  # DominioVacio: !Equals [!Ref DominioOpcional, ""]
 
 Resources:
   
@@ -170,7 +170,7 @@ Resources:
           HostHeaderConfig:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
-              - !If [DominioVacio, "", !Ref DominioOpcional]
+              # - !If [DominioVacio, "", !Ref DominioOpcional]
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
