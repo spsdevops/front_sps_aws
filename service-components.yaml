@@ -75,7 +75,7 @@ Conditions:
   NoHTTPS: !Or [Condition: NoDominioBase, Condition: NoRoute53HostedZoneId, Condition: NoSubdominioBalanceador] 
   HTTPS: !Not [Condition: NoHTTPS]
   DominioVacio: !Equals [!Ref DominioOpcional, ""]
-  NoDominio: !Not [!Ref DominioOpcional]
+  NoDominio: !Not [Condition: DominioVacio]
   DominioVacioOInexistente: !Or [Condition: DominioVacio, Condition: NoDominio]
 
 Resources:
