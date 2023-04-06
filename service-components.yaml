@@ -170,7 +170,7 @@ Resources:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
               - !If 
-                - And
+                - Fn::And:
                   - !Not [!Equals [!Sub "${DominioOpcional}", '']]
                   - !Not [!Equals [!Sub "${DominioOpcional}", null]]
                   - !Sub "${DominioOpcional}"
