@@ -74,6 +74,7 @@ Conditions:
   NoSubdominioBalanceador: !Equals [ !Ref SubdominioBalanceador, ""]
   NoHTTPS: !Or [Condition: NoDominioBase, Condition: NoRoute53HostedZoneId, Condition: NoSubdominioBalanceador] 
   HTTPS: !Not [Condition: NoHTTPS]
+  NoDominioOpcional: !And [!Not [!Equals [!Ref DominioOpcional, ""]], !Not [!Equals [!Ref DominioOpcional, null]]]
 
 Resources:
   
@@ -169,11 +170,7 @@ Resources:
           HostHeaderConfig:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
-              - !If 
-                - Fn::And:
-                  - Fn::Not: [!Equals [!Ref DominioOpcional, '']]
-                  - Fn::Not: [!Equals [!Ref DominioOpcional, null]]
-                - !Ref DominioOpcional
+              - !If [NoDominioOpcional, !Ref DominioOpcional, !Ref "AWS::NoValue"]
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
