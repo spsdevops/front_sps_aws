@@ -37,7 +37,6 @@ Parameters:
     Description: "<HTTP> Path en el que escucha tu aplicación por HTTP. Ejemplo: /test"
     Default: ""
 
-
   HealthPath:
     Type: String
     Description: Path de health del servicio
@@ -63,6 +62,10 @@ Parameters:
   TaskDefinitionARN:
     Type: String
     Description: ARN de Task Definition
+  
+  DominioOpcional:
+    Type: String
+    Description: Valor opcional para la condición OR en listener rule
 
 
 Conditions:
@@ -166,7 +169,7 @@ Resources:
           HostHeaderConfig:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
-              - ejemplo.com.mx
+              - !Sub "${DominioOpcional}"
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener

@@ -37,6 +37,8 @@ env:
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
   BUILDPACK_ENV_FILE: .buildpackenv
 
+  OPTIONAL_DOMAIN: "ejemplo.com"
+
   
 jobs:
   BuildDeploy:
@@ -213,6 +215,7 @@ jobs:
         SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}  \
         Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} \
         DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} \
+        DominioOpcional=${{ env.OPTIONAL_DOMAIN }} \
         NumeroBalanceador=${{ env.AWS_FRONT_ALB_NUMBER }} \
         HealthCode=${{ env.SERVICE_HEALTH_CODE }}"
 
