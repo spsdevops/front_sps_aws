@@ -171,9 +171,9 @@ Resources:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
               - !If 
                 - Fn::And:
-                  - !Not [!Equals [!Sub "${DominioOpcional}", '']]
-                  - !Not [!Equals [!Sub "${DominioOpcional}", null]]
-                  - !Sub "${DominioOpcional}"
+                  - Fn::Not: [!Equals [!Ref DominioOpcional, '']]
+                  - Fn::Not: [!Equals [!Ref DominioOpcional, null]]
+                - !Ref DominioOpcional
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
