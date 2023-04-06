@@ -170,7 +170,7 @@ Resources:
           HostHeaderConfig:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
-              - !If [DominioVacioO, "", !Ref DominioOpcional]
+              - !If [DominioVacio, "", !Ref DominioOpcional]
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
