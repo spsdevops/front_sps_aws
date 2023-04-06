@@ -76,6 +76,7 @@ Conditions:
   HTTPS: !Not [Condition: NoHTTPS]
   DominioVacio: !Equals [!Ref DominioOpcional, ""]
   NoDominio: !Not [!Ref DominioOpcional]
+  DominioVacioOInexistente: !Or [Condition: DominioVacio, Condition: NoDominio]
 
 Resources:
   
@@ -171,7 +172,7 @@ Resources:
           HostHeaderConfig:
             Values:
               - "Fn::Sub": "${ServiceName}.${SubdominioBalanceador}.${DominioBase}"
-              - !If [!Or [Condition: DominioVacio, Condition: NoDominio], "", !Ref DominioOpcional]
+              - !If [DominioVacioOInexistente, "", !Ref DominioOpcional]
       ListenerArn:
         Fn::ImportValue: !Sub "${NombreVPC}-FrontAlbListenerHTTPS${NumeroBalanceador}"
       Priority: !Ref PrioridadListener
