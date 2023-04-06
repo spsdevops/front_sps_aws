@@ -36,9 +36,6 @@ env:
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
   BUILDPACK_ENV_FILE: .buildpackenv
-
-  OPTIONAL_DOMAIN: "ejemplo.com.mx"
-
   
 jobs:
   BuildDeploy:
