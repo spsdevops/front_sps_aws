@@ -164,6 +164,7 @@ jobs:
         cat task-definition.json
     - name: Importación de secretos del servicio
       run: |
+        pip install boto3=1.26.109
         python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json
         cat task-definition.json
 
