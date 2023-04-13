@@ -48,7 +48,25 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1
-           
+
+    - name: "Información"
+      run: |
+        cat INFO.md >> "$GITHUB_STEP_SUMMARY" || echo "No hay archivo INFO.md"
+
+    - name: "Linter Github Workflow"
+      run: |
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -color
+      shell: bash
+   
+    - name: "Palabras prohibidas en código"
+      run: |
+        ! grep -E 'cfenv' -rn \
+        --exclude-dir=.github \
+        --include=package.json \
+        --include=*.js \
+        .
+
     - name: "CFN Lint - Linter de Cloudformation Frontend"
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
       run: |
@@ -113,18 +131,21 @@ jobs:
         role-to-assume: arn:aws:iam::${{secrets.DEV_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
         role-session-name: ${{ github.event.repository.name }}
 
-    - name: build image Java
-      if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
-      run: |
-        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
-        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack paketo-buildpacks/eclipse-openj9 --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
-
-    - name: build image
+    - name: Build image
       if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
       run: |
         aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
+        buildpacks=()
+        for bp in $BUILDPACK_LANGUAGE; do buildpacks+=(--buildpack "$bp"); done
+        echo Buikdpack a usar: "${buildpacks[@]}"
         pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
+        --builder ${{ env.BUILDPACK_BUILDER }} \
+        --path . \
+        --env-file ${{ env.BUILDPACK_ENV_FILE }} "${buildpacks[@]}"
+
+    - name: Check Docker Repository
+      run: |
+        echo "Se está validando si existe el repositorio ${{ env.SERVICE_NAME }}"
+        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "${{ secrets.DOCKER_HUB_USER }}", "password": "${{ secrets.DOCKER_HUB_PASS }}"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+        IS_PRIVATE=$(curl -s -H "Authorization: JWT ${TOKEN}" https://hub.docker.com/v2/repositories/${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }} | jq -r '.is_private')
+        if [ "$IS_PRIVATE" = "true" ]; then echo "El repositorio existe"; else echo "El repositorio no existe, solicita su creación" && exit 1; fi
