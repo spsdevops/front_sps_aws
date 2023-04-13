@@ -39,8 +39,8 @@ env:
 
   
 jobs:
-  BuildDeploy:
-    name: Build and deploy
+  Build:
+    name: Build
     runs-on:
     - ubuntu-latest
     steps:
@@ -48,6 +48,24 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1
+
+    - name: "Información"
+      run: |
+        cat INFO.md >> "$GITHUB_STEP_SUMMARY" || echo "No hay archivo INFO.md"
+
+    - name: "Linter Github Workflow"
+      run: |
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -color
+      shell: bash
+
+    - name: "Palabras prohibidas en código"
+      run: |
+        ! grep -E 'cfenv' -rn \
+        --exclude-dir=.github \
+        --include=package.json \
+        --include=*.js \
+        .
            
     - name: "CFN Lint - Linter de Cloudformation Frontend"
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
@@ -112,26 +130,49 @@ jobs:
       with: 
         aws-region: ${{ env.AWS_DEPLOY_REGION }}
         role-to-assume: arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
-        role-session-name: ${{ github.event.repository.name }}
+        role-session-name: ${{ github.event.repository.name }}-Build
 
-    - name: build image Java
-      if: ${{ env.BUILDPACK_LANGUAGE == 'paketo-buildpacks/java'}}
-      run: |
-        aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
-        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack paketo-buildpacks/eclipse-openj9 --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
-
-    - name: build image
+    - name: Build image
       if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
       run: |
         aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
-        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-        --builder ${{ env.BUILDPACK_BUILDER }} --path . --buildpack ${{ env.BUILDPACK_LANGUAGE }} \
-        --env-file ${{ env.BUILDPACK_ENV_FILE }}
+        buildpacks=()
+        for bp in $BUILDPACK_LANGUAGE; do buildpacks+=(--buildpack "$bp"); done
+        echo Buikdpack a usar: "${buildpacks[@]}"
+        pack build ${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+        --builder ${{ env.BUILDPACK_BUILDER }} \
+        --path . \
+        --env-file ${{ env.BUILDPACK_ENV_FILE }} "${buildpacks[@]}"
+
+    - name: Check Docker Repository
+      run: |
+        echo "Se está validando si existe el repositorio ${{ env.SERVICE_NAME }}"
+        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "${{ secrets.DOCKER_HUB_USER }}", "password": "${{ secrets.DOCKER_HUB_PASS }}"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+        IS_PRIVATE=$(curl -s -H "Authorization: JWT ${TOKEN}" https://hub.docker.com/v2/repositories/${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }} | jq -r '.is_private')
+        if [ "$IS_PRIVATE" = "true" ]; then echo "El repositorio existe"; else echo "El repositorio no existe, solicita su creación" && exit 1; fi
 
     - name: Push Image
-      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+      run: docker push ${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+
+
+  Deploy:
+    needs: Build
+    name: Deploy
+    runs-on:
+    - ubuntu-latest
+    steps:
+    - id: checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+
+    # Autenticar en AWS sin utilizar secretos
+    - name: Configure AWS Deploy Role 
+      uses: aws-actions/configure-aws-credentials@v1-node16
+      with: 
+        aws-region: ${{ env.AWS_DEPLOY_REGION }}
+        role-to-assume: arn:aws:iam::${{secrets.PROD_AWS_ACCOUNT_ID}}:role/github-actions-deploy-role
+        role-session-name: ${{ github.event.repository.name }}-Deploy
 
     - name: Reemplazo de ARN's en Task Definition
       run: |
@@ -158,13 +199,27 @@ jobs:
 
         jq -r '.containerDefinitions[].portMappings[].containerPort |= "${{ env.SERVICE_PORT }}"' task-definition.json > tmp.json
         mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].environment += [{"name": "BIND_PORT", "value": "${{ env.SERVICE_PORT }}"}]' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.containerDefinitions[].environment += [{"name": "BIND", "value": "0.0.0.0"}]' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.cpu |= "${{ env.TASK_CPU }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
+
+        jq -r '.memory |= "${{ env.TASK_MEMORY }}"' task-definition.json > tmp.json
+        mv tmp.json task-definition.json
         
         sed -i 's/CLUSTER_NAME/'"${{ env.AWS_ECS_CLUSTER }}"'/g' task-definition.json
 
+        cat task-definition.json
     - name: Importación de secretos del servicio
       run: |
-        pip install boto3=1.26.109
+        pip install boto3==1.26.109
         python3 import_secrets.py -r ${{ env.AWS_DEPLOY_REGION }} -c ${{ env.AWS_ECS_CLUSTER }} -s ${{ env.SERVICE_NAME }} -t task-definition.json
+        cat task-definition.json
 
     - name: Render Amazon ECS Task Definition
       id: render-task-definition
@@ -172,7 +227,7 @@ jobs:
       with: 
         task-definition: task-definition.json
         container-name: ${{ env.SERVICE_NAME }}
-        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+        image: docker.io/${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
     - name: Deploy Amazon ECS task definition 
       id: deploy-task-definition
@@ -181,7 +236,9 @@ jobs:
         task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
 
     - name: Task Definition ARN
-      run: echo ${{ steps.deploy-task-definition.outputs.task-definition-arn }}
+      id: task-definition
+      run: |
+        echo ${{ steps.deploy-task-definition.outputs.task-definition-arn }}
 
     - name: Install SAM CLI
       uses: aws-actions/setup-sam@v2
@@ -190,108 +247,111 @@ jobs:
 
     - name: Crear/Actualizar servicio ECS Frontend
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'webs'}}
-      run: |
-        sam deploy \
-        -t service-components.yaml \
-        --stack-name service-${{ env.SERVICE_NAME }} \
-        --no-fail-on-empty-changeset  \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
-        --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} \
-        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
-        repo=${{ github.repository }} \
-        service=${{ env.SERVICE_NAME }}" \
-        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
-        TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
-        HealthPath=${{ env.SERVICE_HEALTH_PATH }}  \
-        ClusterName=${{ env.AWS_ECS_CLUSTER }} \
-        ContainerPort=${{ env.SERVICE_PORT }} \
-        PrioridadListener=${{ env.AWS_FRONT_ALB_PRIORITY }} \
-        NombreVPC=${{ env.AWS_VPC_NAME }} \
-        SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}  \
-        Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} \
-        DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} \
-        NumeroBalanceador=${{ env.AWS_FRONT_ALB_NUMBER }} \
-        HealthCode=${{ env.SERVICE_HEALTH_CODE }} \"
-
+      run: >-
+        sam deploy
+        -t service-components.yaml
+        --stack-name service-${{ env.SERVICE_NAME }}
+        --no-fail-on-empty-changeset
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+        --no-confirm-changeset
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}}
+        --s3-prefix ${{ env.SERVICE_NAME }}-service
+        --tags "CommitHash=${{ github.sha }}
+        ClusterECS=${{ env.AWS_ECS_CLUSTER }}
+        Repo=${{ github.repository }}
+        Service=${{ env.SERVICE_NAME }}"
+        --parameter-overrides="ClusterName='${{ env.AWS_ECS_CLUSTER }}'
+        ContainerPort='${{ env.SERVICE_PORT }}'
+        NumeroBalanceador='${{ env.AWS_FRONT_ALB_NUMBER }}'
+        DominioBase='${{ env.AWS_R53_BASE_DOMAIN }}'
+        Route53HostedZoneId='${{ env.AWS_R53_HOSTED_ZONE_ID }}'
+        SubdominioBalanceador='${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_FRONT_ALB_NUMBER }}'
+        HealthPath='${{ env.SERVICE_HEALTH_PATH }}'
+        HealthCode='${{ env.SERVICE_HEALTH_CODE }}'
+        NombreVPC='${{ env.AWS_VPC_NAME }}'
+        PrioridadListener='${{ env.AWS_FRONT_ALB_PRIORITY }}'
+        ServiceName='${{ env.SERVICE_NAME }}'
+        TaskDefinitionARN='${{ steps.deploy-task-definition.outputs.task-definition-arn }}'
+        DominioOpcional='${{ env.OPTIONAL_DOMAIN }}'
+        HealthCount='${{ env.SERVICE_HEALTH_COUNT }}'
+        HealthTimeout='${{ env.SERVICE_HEALTH_TIMEOUT }}'
+        HealthIntervalo='${{ env.SERVICE_HEALTH_INTERVALO }}'
+        ServiceReplicas='${{ env.SERVICE_REPLICAS }}'"
 
     - name: Crear/Actualizar servicio ECS Backend
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
-      run: |
-        sam deploy \
-        -t service-components.yaml \
-        --stack-name service-${{ env.SERVICE_NAME }} \
-        --no-fail-on-empty-changeset  \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
-        --s3-prefix ${{ env.SERVICE_NAME }}-service \
-        --tags "commit_hash=${{ github.sha }} \
-        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
-        repo=${{ github.repository }} \
-        service=${{ env.SERVICE_NAME }}" \
-        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
-        TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
-        HealthPath=${{ env.SERVICE_HEALTH_PATH }} \
-        ClusterName=${{ env.AWS_ECS_CLUSTER }} \
-        ContainerPort=${{ env.SERVICE_PORT }} \
-        PrioridadListener=${{ env.AWS_ALB_PRIORITY }} \
-        NombreVPC=${{ env.AWS_VPC_NAME }} \
-        DominioBase=${{ env.AWS_R53_BASE_DOMAIN }} \
-        SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_ALB_NUMBER }} \
-        HealthCode=${{ env.SERVICE_HEALTH_CODE }}"
+      run: >-
+        sam deploy
+        -t service-components.yaml
+        --stack-name service-${{ env.SERVICE_NAME }}
+        --no-fail-on-empty-changeset
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+        --no-confirm-changeset
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}}
+        --s3-prefix ${{ env.SERVICE_NAME }}-service
+        --tags "CommitHash=${{ github.sha }}
+        ClusterECS=${{ env.AWS_ECS_CLUSTER }}
+        Repo=${{ github.repository }}
+        Service=${{ env.SERVICE_NAME }}"
+        --parameter-overrides="NombreVPC='${{ env.AWS_VPC_NAME }}'
+        ApiAlbNumber='${{ env.AWS_ALB_NUMBER }}'
+        ClusterName='${{ env.AWS_ECS_CLUSTER }}'
+        ServiceName='${{ env.SERVICE_NAME }}'
+        TaskDefinitionARN='${{ steps.deploy-task-definition.outputs.task-definition-arn }}'
+        HealthPath='${{ env.SERVICE_HEALTH_PATH }}'
+        HealthCode='${{ env.SERVICE_HEALTH_CODE }}'
+        ContainerPort='${{ env.SERVICE_PORT }}'
+        PrioridadListener='${{ env.AWS_ALB_PRIORITY }}'
+        DominioBase='${{ env.AWS_R53_BASE_DOMAIN }}'
+        SubdominioBalanceador='${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_ALB_NUMBER }}'
+        HealthCount='${{ env.SERVICE_HEALTH_COUNT }}'
+        HealthTimeout='${{ env.SERVICE_HEALTH_TIMEOUT }}'
+        HealthIntervalo='${{ env.SERVICE_HEALTH_INTERVALO }}'
+        ServiceReplicas='${{ env.SERVICE_REPLICAS }}'"
     
     - name: Crear/Actualizar API Gateway
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
-      run: |
-        sam deploy \
-        -t api-gateway.yaml \
-        --stack-name api-${{ env.SERVICE_NAME }} \
-        --no-fail-on-empty-changeset  \
-        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-        --no-confirm-changeset \
-        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}} \
-        --s3-prefix ${{ env.SERVICE_NAME }}-api \
-        --tags "commit_hash=${{ github.sha }} \
-        cluster_ECS=${{ env.AWS_ECS_CLUSTER }} \
-        repo=${{ github.repository }} \
-        service=${{ env.SERVICE_NAME }}" \
-        --parameter-overrides="ServiceName=${{ env.SERVICE_NAME }} \
-        TaskDefinitionARN=${{ steps.deploy-task-definition.outputs.task-definition-arn }} \
-        NombreVPC=${{ env.AWS_VPC_NAME }} \
-        ClusterName=${{ env.AWS_ECS_CLUSTER }} \
-        SubdominioBalanceador=${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_ALB_NUMBER }} \
-        Route53HostedZoneId=${{ env.AWS_R53_HOSTED_ZONE_ID }} \
-        DominioBase=${{ env.AWS_R53_BASE_DOMAIN }}"
+      run: >-
+        sam deploy
+        -t api-gateway.yaml
+        --stack-name api-${{ env.SERVICE_NAME }}
+        --no-fail-on-empty-changeset
+        --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+        --no-confirm-changeset
+        --s3-bucket sam-bucket-${{secrets.PROD_AWS_ACCOUNT_ID}}
+        --s3-prefix ${{ env.SERVICE_NAME }}-api
+        --tags "CommitHash='${{ github.sha }}'
+        ClusterECS='${{ env.AWS_ECS_CLUSTER }}'
+        Repo='${{ github.repository }}'
+        Service='${{ env.SERVICE_NAME }}'"
+        --parameter-overrides="NombreVPC='${{ env.AWS_VPC_NAME }}'
+        ApiAlbNumber='${{ env.AWS_ALB_NUMBER }}'
+        ServiceName='${{ env.SERVICE_NAME }}'
+        ClusterName='${{ env.AWS_ECS_CLUSTER }}'
+        DominioBase='${{ env.AWS_R53_BASE_DOMAIN }}'
+        Route53HostedZoneId='${{ env.AWS_R53_HOSTED_ZONE_ID }}'
+        SubdominioBalanceador='${{ env.AWS_R53_SUB_DOMAIN }}${{ env.AWS_ALB_NUMBER }}'"
 
     - name: URL del servicio
       run: |
-        echo "Puedes consultar tu servicio en la siguiente URL "https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}""   
-        echo "-----------------" >> $GITHUB_STEP_SUMMARY
-        echo "## URL" >> $GITHUB_STEP_SUMMARY
-        echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
-
-
-    - name: URL del servicio
-      run: |
-        echo "Puedes consultar tu servicio en la siguiente URL "https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}""   
-        echo "-----------------" >> $GITHUB_STEP_SUMMARY
-        echo "## URL" >> $GITHUB_STEP_SUMMARY
-        echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**" >> $GITHUB_STEP_SUMMARY
-
+        echo "Puedes consultar tu servicio en la siguiente URL https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}${{env.AWS_FRONT_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}"
+        {
+          echo "-----------------------"
+          echo "## URL"
+          echo "- **https://${{ env.SERVICE_NAME }}.${{env.AWS_R53_SUB_DOMAIN}}${{env.AWS_ALB_NUMBER}}${{env.AWS_FRONT_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}**"
+        }  >> "$GITHUB_STEP_SUMMARY"
 
     - name: Agregar valores de API Gateway a SSM
       if: ${{ env.AWS_R53_SUB_DOMAIN == 'apis'}}
       run: |
         echo "Se obtiene APIKEY ID de los exports del stack"
+        # shellcheck disable=SC2016
         APIKEY_ID=$(aws cloudformation --region ${{ env.AWS_DEPLOY_REGION }} describe-stacks --stack-name api-${{ env.SERVICE_NAME }} \
         --query 'Stacks[0].Outputs[?OutputKey==`ApiKey`].OutputValue' --output text)
 
         echo "Se obtiene el valor de la API Key"
-        APIKEY_QUOTES=$(aws apigateway get-api-key --api-key $APIKEY_ID --include-value --region ${{ env.AWS_DEPLOY_REGION }} --query 'value')
-        
+        APIKEY_QUOTES=$(aws apigateway get-api-key --api-key "$APIKEY_ID" --include-value --region ${{ env.AWS_DEPLOY_REGION }} --query 'value')
+
         temp="${APIKEY_QUOTES%\"}"
         APIKEY="${temp#\"}"
         ENDPOINT="https://${{ env.SERVICE_NAME }}.apis${{env.AWS_ALB_NUMBER}}.${{env.AWS_R53_BASE_DOMAIN}}"
@@ -300,8 +360,7 @@ jobs:
                           --arg ep "$ENDPOINT" \
                           --arg ak "$APIKEY" \
                           '{ENDPOINT: $ep, APIKEY: $ak}' )
-
-                  
+           
         echo "Se agrega API Key y endpoint en SSM"
         aws ssm put-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-api --value \
         "$SSM_CONTENT" --overwrite --type SecureString --region ${{ env.AWS_DEPLOY_REGION }}
