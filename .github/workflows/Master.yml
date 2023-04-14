@@ -19,7 +19,6 @@ env:
   AWS_ECS_CLUSTER: hello-world
 
   SERVICE_NAME: front-hello-world
-  SERVICE_PORT: 8000
   SERVICE_HEALTH_PATH: /
   SERVICE_HEALTH_CODE: 200
   SERVICE_HEALTH_COUNT: 5
@@ -27,26 +26,29 @@ env:
   SERVICE_HEALTH_INTERVALO: 30
   SERVICE_REPLICAS: 1
 
-  # TAMAÑO E INSTANCIAS DE LAS TAREAS.
-  # El CPU y memoria deben coincidir entre ellas. Para mayor información visitar:
-  # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size
-  TASK_CPU: 512
-  TASK_MEMORY: 1024
-
-  SONAR_PROJECT_KEY: front-hello-world
-  SONAR_SCAN: false  
-  
-  AWS_FRONT_ALB_NUMBER: 1
-  AWS_FRONT_ALB_PRIORITY: 1
-  AWS_R53_SUB_DOMAIN: "webs"
-
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs@0.12.0
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
 
-  OPTIONAL_DOMAIN: ""
+  # Tamaño de las tareas
+  TASK_CPU: 512
+  TASK_MEMORY: 1024
+
+  # SonarQube
+  SONAR_PROJECT_KEY: front-hello-world
+  SONAR_SCAN: false  
+
+  # Variables exclusivas de servicios WEB
+  AWS_FRONT_ALB_NUMBER: 1
+  AWS_FRONT_ALB_PRIORITY: 1
+  AWS_R53_SUB_DOMAIN: "webs"
+  OPTIONAL_DOMAIN: ""  
+
+  # Variables exclusivas de servicios API
+  AWS_ALB_NUMBER: ""
+  AWS_ALB_PRIORITY: ""
 
   # CUIDADO ESTAS VARIABLES NORMALMENTE NO SE MODIFICAN  
-  SERVICE_PORT: 8000
+  SERVICE_PORT: 8080
 
   AWS_R53_BASE_DOMAIN: "test.timelineage.site"
   AWS_R53_HOSTED_ZONE_ID: "Z05524491VQ38G93MIPQD"
@@ -56,8 +58,7 @@ env:
 
   DOCKER_ORG: 1775nmpti
 
-  BUILDPACK_ENV_FILE: .buildpackenv
-  
+  BUILDPACK_ENV_FILE: .buildpackenv  
 jobs:
   Build:
     name: Build
