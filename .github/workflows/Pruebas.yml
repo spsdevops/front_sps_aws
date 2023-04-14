@@ -3,7 +3,7 @@ name: Pruebas
 permissions:
   id-token: write
   contents: read    
-  concurrency: test
+concurrency: test
 
 on:
   push:
