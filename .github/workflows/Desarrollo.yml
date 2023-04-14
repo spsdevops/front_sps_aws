@@ -24,6 +24,7 @@ env:
   SERVICE_HEALTH_TIMEOUT: 6
   SERVICE_HEALTH_INTERVALO: 30
   SERVICE_REPLICAS: 1
+  AWS_R53_SUB_DOMAIN: "webs"
 
   BUILDPACK_LANGUAGE: paketo-buildpacks/nodejs@0.12.0
   BUILDPACK_BUILDER: paketobuildpacks/builder:base
@@ -39,7 +40,6 @@ env:
   # Variables exclusivas de servicios WEB
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
-  AWS_R53_SUB_DOMAIN: "webs"
   OPTIONAL_DOMAIN: ""  
 
   # Variables exclusivas de servicios API
