@@ -153,7 +153,6 @@ jobs:
         role-session-name: ${{ github.event.repository.name }}-Build
 
     - name: Build image
-      if: ${{ env.BUILDPACK_LANGUAGE != 'paketo-buildpacks/java'}}
       run: |
         aws ssm get-parameter --name /${{ env.AWS_ECS_CLUSTER }}/${{ env.SERVICE_NAME }}-build-vars --region ${{env.AWS_DEPLOY_REGION}}  --with-decryption --query "Parameter.Value" --output text >> .buildpackenv || echo "WARNING: No se encontró el parámetro con las variables de construcción."
         buildpacks=()
