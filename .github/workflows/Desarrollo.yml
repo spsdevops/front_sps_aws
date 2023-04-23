@@ -40,7 +40,7 @@ env:
   # Variables exclusivas de servicios WEB
   AWS_FRONT_ALB_NUMBER: 1
   AWS_FRONT_ALB_PRIORITY: 1
-  OPTIONAL_DOMAIN: ""  
+  OPTIONAL_DOMAIN: "hola.timelineage.site"  
 
   # Variables exclusivas de servicios API
   AWS_ALB_NUMBER: ""
