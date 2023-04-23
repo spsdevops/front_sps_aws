@@ -163,15 +163,8 @@ jobs:
         --path . \
         --env-file ${{ env.BUILDPACK_ENV_FILE }} "${buildpacks[@]}"
 
-    - name: Check Docker Repository
-      run: |
-        echo "Se está validando si existe el repositorio ${{ env.SERVICE_NAME }}"
-        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "${{ secrets.DOCKER_HUB_USER }}", "password": "${{ secrets.DOCKER_HUB_PASS }}"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
-        IS_PRIVATE=$(curl -s -H "Authorization: JWT ${TOKEN}" https://hub.docker.com/v2/repositories/${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }} | jq -r '.is_private')
-        if [ "$IS_PRIVATE" = "true" ]; then echo "El repositorio existe"; else echo "El repositorio no existe, solicita su creación" && exit 1; fi
-
     - name: Push Image
-      run: docker push ${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
+      run: docker push ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
 
 
   Deploy:
