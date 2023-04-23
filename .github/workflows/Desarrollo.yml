@@ -158,7 +158,7 @@ jobs:
         buildpacks=()
         for bp in $BUILDPACK_LANGUAGE; do buildpacks+=(--buildpack "$bp"); done
         echo Buikdpack a usar: "${buildpacks[@]}"
-        pack build ${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev \
+        pack build ${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev \
         --builder ${{ env.BUILDPACK_BUILDER }} \
         --path . \
         --env-file ${{ env.BUILDPACK_ENV_FILE }} "${buildpacks[@]}"
@@ -239,7 +239,7 @@ jobs:
       with: 
         task-definition: task-definition.json
         container-name: ${{ env.SERVICE_NAME }}
-        image: docker.io/${{ env.DOCKER_ORG }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
+        image: docker.io/${{ secrets.DOCKER_HUB_USER }}/${{ env.SERVICE_NAME }}:${{ github.sha }}-dev
 
     - name: Deploy Amazon ECS task definition 
       id: deploy-task-definition
